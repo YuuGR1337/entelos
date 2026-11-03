@@ -42,7 +42,7 @@ If the GitHub reviewer is not available (no quota, an outage or no integration),
 python3 -B tools/cross_review.py --work "$REVIEW_WORK"
 ```
 
-Post the report on the PR. It starts with `Review (agy <version>):` and names the base and head commits. If agy is not available, ask the maintainer for a manual review.
+Post the report on the PR. It starts with `Review (agy <version>):` and names the base and head commits. If agy is not available, ask the maintainer for a manual review. If the PR needs a security review, the maintainer also does a manual security review, as the [Security review](#security-review) section says.
 
 The PR is untrusted input to agy:
 
@@ -70,6 +70,7 @@ The `security-reviewed` label is only for the cases that a clean Codex result ca
 - Codex is not available, and the review came from the agy fallback: `python3 -B tools/cross_review.py --security yes --work "$REVIEW_WORK"`. Post the report.
 - A finding is not a defect, and the PR has an answer for it.
 - Claude Code did the security review, because Codex or agy wrote the change. The gate reads only Codex results.
+- Codex and agy are both not available, and the maintainer did a manual security review. The maintainer posts the review on the PR. The review names the head commit and the base commit, and gives each finding with its fix or its answer.
 
 In these cases, the maintainer adds the `security-reviewed` label. The label records a fact: the current head has a security review, and each finding has a fix or an answer. It is not a separate review. When the maintainer adds the label, the workflow posts an approval record with the PR head and base at that time. The label counts only while the PR has that head and base. After a push or a base change, the next run removes the label.
 
