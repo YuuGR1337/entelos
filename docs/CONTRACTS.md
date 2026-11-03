@@ -41,3 +41,21 @@ The case structure and comparison rules are implemented by [`Case` and `Bundle.C
 Replay retains the original input and execution closure. Restatement names a later accepted root and computes a separate answer for the retained original input. A correction to application facts therefore requires a new input/call and an explicit relationship supplied by the application; restatement does not reread a live fact source.
 
 Applications supply source authority, independent expectations, admission/learning policy, authentication, retention and side effects. See [INTEGRATION.md](INTEGRATION.md), [SECURITY.md](../SECURITY.md) and [SUPPORT.md](SUPPORT.md) before treating the local reference as an application component.
+
+## Author fixtures
+
+`prepare.py --fixture` reads the following fields from a JSON fixture:
+
+| Field | Meaning |
+|---|---|
+| `function_id` | Identifier written to the generated manifest. |
+| `environment` | Object written to `env.json`. It contains a `name` and `variables`; each variable has a `name`, `type` and `description`. The host accepts `string` and `bool` variable types. |
+| `caller_variables` | Names of the variables supplied by each caller. The remaining declared variables must have fixed bindings. |
+| `fixed_bindings` | Object written to `fixed.json` and combined with each successful case's inputs when preparing upstream tests. Its keys must be declared variables that are not caller variables. |
+| `expression` | CEL source written to `rule.cel`. |
+| `expected_calls` | Case records written to `cases.json`. Each record supplies `case`, `inputs` and `status`; successful (`ok`) cases also supply `value`, while refusal cases may supply `field` to check the diagnostic location. Only `ok` cases are included in `upstream-tests.json`. |
+| `proposed_profile.resource_budgets` | Resource limits copied to the generated manifest as integers, except the descriptive `status` and `cost_model` entries. |
+
+`prepare.py` does not read the fixture's descriptive metadata such as `kind`, `requirement`, `workflow_source` or `expected_cel_output_type`. Those fields do not affect the generated bundle.
+
+Fixed values must use the JSON type declared for their variable: a `bool` needs a JSON boolean and a `string` needs a JSON string. The host rejects null and does not coerce values, so `"false"` is not a boolean. Fixed strings are subject to the manifest's `max_string_utf8_bytes` limit, measured in UTF-8 bytes. Caller and fixed names must be disjoint, and every declared variable must appear in one of those two sets.
