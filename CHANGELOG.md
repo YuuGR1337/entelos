@@ -2,7 +2,7 @@
 
 This file lists the changes for each snapshot tag. A tag is a stable snapshot to cite and copy. It is not a package release, and it does not promise a stable API or record format.
 
-## Unreleased: v0.1.0
+## v0.1.0 (2026-11-04)
 
 The first snapshot. It contains the runnable reference and its docs.
 
