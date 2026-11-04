@@ -24,7 +24,7 @@ On 2026-10-29, the code moved to `src/` and `examples/`, the boundary test moved
 
 ## Next work
 
-Use [BACKLOG.md](BACKLOG.md) and the linked GitHub issues. The next milestone is [M4 Contributor path](https://github.com/mohanraj00/entelos/issues/13).
+Use [BACKLOG.md](BACKLOG.md) and the linked GitHub issues. The next milestone is [M5 Snapshot and announcement](https://github.com/mohanraj00/entelos/issues/14).
 
 ### M1 First contact
 
@@ -78,6 +78,21 @@ These are the limits of the M3 result:
 
 - An agent wrote the example from the docs, not an engineer from outside the project.
 - The example uses only the current profile: string/bool inputs and a bool output.
+
+### M4 Contributor path
+
+On 2026-11-03, the M4 exit test was met in `main`:
+
+- PR #67 (merge `1339d71`) adds `CONTRIBUTING.md`, issue templates and a review path for a contributor without an agent harness.
+- PR #68 (merge `6043da4`) runs `verify.py` on `macos-15` in CI, beside `ubuntu-24.04`.
+- PR #69 (merge `718ca52`, issue #64) is the first pull request from an outside contributor. It merged through the documented path.
+- PR #70 (merge `9ee54ed`, issue #63) is a second outside pull request.
+- PR #72 (merge `5616680`) adds a manual security review for when Codex and agy are both not available.
+
+These are the limits of the M4 result:
+
+- The outside pull requests changed only docs. No outside contributor changed code.
+- Starter issues #62, #65 and #66 are open. PR #71 for issue #65 is open.
 
 Keep caller walkthrough and input-correction documentation bounded to the existing examples. Numeric/structured profiles, production DBs, authentication gateways and resident-worker coordination are outside the current implemented scope.
 

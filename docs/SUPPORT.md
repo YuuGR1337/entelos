@@ -10,7 +10,7 @@ The reviewed local run uses Go 1.27.2, Python 3.14.6 and Git 2.54.0 on macOS arm
 
 CEL Go is pinned to v0.32.0 and the author CLI source to commit 5eac36c53cd8971fa1e5548374238183e0d8b302. The module lockfiles select the dependency closure. A pin or runtime-source change requires new build identity, fresh qualification and the relevant checks. Keep the old build/inputs/artifacts for exact replay. The Git store does not archive executable toolchains for you.
 
-APIs, JSON records and the local storage format may change before a release contract is chosen. Do not assume new code can load or exactly replay old stores. Migration and compatibility replay need their own explicit design and tests. Content hashes are not signatures or source authority.
+APIs, JSON records and the local storage format may change before a release contract is chosen. The v0.1.0 snapshot has no record format version field. A record does not identify the format that wrote it, so a reader cannot detect a change of format. The version field and the migration rules are work for after v0.1.0. Do not assume new code can load or exactly replay old stores. Migration and compatibility replay need their own explicit design and tests. Content hashes are not signatures or source authority.
 
 ## Operating limits
 
