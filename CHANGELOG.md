@@ -21,8 +21,19 @@ The first snapshot. It contains the runnable reference and its docs.
 - [CONTRACTS.md](docs/CONTRACTS.md) gives the callable cases and the author fixture fields.
 - `CONTRIBUTING.md`, issue templates and a review path for a contributor without an agent harness.
 
+### Security fixes
+
+The M5 security review of the approval and record path found five issues. #74 fixed them.
+
+- An answer now requires the lifecycle build that the qualification report names. Before, only the report check compared the build.
+- The reviewer who approves must be different from the producer and the policy runner.
+- A replay receipt records `matches_original`, which shows if the new answer is the same as the recorded answer.
+- A wrong JSON type in `inputs_json` and very deep JSON nesting now give a fault. Before, they stopped the CLI stream.
+
 ### Limits
 
 - The record format has no version field. A later snapshot can change the records, and new code may not load an old store. See [SUPPORT.md](docs/SUPPORT.md).
 - APIs are unstable. The only callable profile is string/bool input and bool output.
 - Linux and macOS are tested. Windows is not tested.
+- The `inspect` and `record` reads do not check the scope. Use one store for each scope.
+- A `request_key` with a NUL byte gives `store_error`. The state does not change.

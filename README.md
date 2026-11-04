@@ -150,6 +150,8 @@ This is local reference code with unstable APIs and records. Host context and re
 
 CI ingress verification is simulated. No webhook is authenticated and no pipeline is launched. Its raw-event audit sidecar is not atomic with the Git receipt. The application supplies source truth, independent expectations, admission/learning policy, authentication, retention and side effects. See [INTEGRATION.md](docs/INTEGRATION.md), [SUPPORT.md](docs/SUPPORT.md) and [SECURITY.md](SECURITY.md).
 
+The M5 security review found two open limits. The `inspect` and `record` reads do not check the scope, so a reviewer can read all records in a shared store. Use one store for each scope. A `request_key` that contains a NUL byte gives `store_error` and leaves unused Git objects, but it does not change the state.
+
 The complete source-to-correction workflow is reproducible here. Production adapters and operations remain separate work. Ordinary code plus Git is appropriate when these explicit contracts and histories are unnecessary.
 
 ## Run all checks
