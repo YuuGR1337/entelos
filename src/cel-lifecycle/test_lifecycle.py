@@ -174,6 +174,29 @@ class Conformance(unittest.TestCase):
                              base_snapshot=self.pins['correction_snapshot'],source_ref=snapshot['source_ref'],
                              bundle=['manifest','environment','source','fixed'],reason='malformed author request')
         self.fault('invalid_bundle',lambda:self.host('author').handle(request))
+    def test_answers_require_the_qualified_lifecycle_build(self):
+        host=self.host('worker');host.build_ref='sha256:'+'0'*64
+        self.fault('implementation_unavailable',lambda:host.handle(self.request('load',function='record.visible',date='2026-11-15')))
+        host=self.host('caller');host.build_ref='sha256:'+'0'*64
+        selected=self.host('reader').handle({'op':'resolve','function':'record.visible','date':'2026-11-15'})
+        before=self.store.root()
+        self.fault('implementation_unavailable',lambda:host.handle(self.request('invoke',function='record.visible',date='2026-11-15',expected_bundle_ref=selected['bundle_ref'],inputs={'state':'ready','archived':False})))
+        self.assertEqual(self.store.root(),before)
+    def test_reviewer_must_differ_from_producer_and_runner(self):
+        report_ref=self.store.read().get(self.pins['decision'],'decision')['report_ref']
+        for actor in ('author','fixture-runner'):
+            host=self.host('reviewer');host.context=host.context|{'actor':actor}
+            self.fault('separation_required',lambda:host.handle(self.request('decide',report_ref=report_ref,reason='self approval')))
+    def test_replay_records_whether_the_answer_matches(self):
+        old=self.host('reader').handle({'op':'receipt','receipt_ref':self.pins['old_receipt']})
+        value=self.host('reader').handle(self.request('replay',receipt_ref=self.pins['old_receipt'],reason='match test'))['result']
+        self.assertIs(value['receipt']['matches_original'],True);self.assertEqual(value['receipt']['response_ref'],old['response_ref'])
+    def test_wrong_json_types_and_deep_nesting_are_faults(self):
+        before=self.store.root()
+        for raw in (5,None,{}):
+            self.fault('invalid_request',lambda:self.host('reader').handle(self.request('replay',receipt_ref=self.pins['old_receipt'],inputs_json=raw,reason='type test')))
+        self.fault('invalid_record',lambda:decode(b'['*400000+b']'*400000))
+        self.assertEqual(self.store.root(),before)
     def test_restatement_cannot_use_a_null_cursor(self):
         self.fault('invalid_cursor',lambda:self.host('reader').handle(self.request('restate',receipt_ref=self.pins['old_receipt'],cursor=None,reason='must be explicit')))
     def test_git_object_integrity_and_restart(self):

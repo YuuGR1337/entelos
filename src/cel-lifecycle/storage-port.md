@@ -14,7 +14,7 @@ The Host uses store `read(cursor)`, `transact(expected,key,payload,apply)` and a
 | Applicability | Exact scope, half-open dates, explicit interval masks | Same overlap/partial-mask/suspension and fail-closed ambiguity semantics; no implicit SQL iteration priority |
 | Runtime observation | Loaded event/snapshot/build stored separately | Preserve desired versus observed loaded state, including unavailable revision behavior |
 | Receipt retention | Immutable inputs/closure/outcome and append-only receipt refs | Transactional append/uniqueness with retained dependencies and access policy; report actual, not desired, identities |
-| Correction/replay | Old inputs/build/snapshot preserved; restatement links prior receipt | Byte-identical replay or explicit unavailable result; later-cursor restatement must remain a separate record |
+| Correction/replay | Old inputs/build/snapshot preserved; restatement links prior receipt | Byte-identical replay inputs, a recorded `matches_original` response comparison, or an explicit unavailable result; later-cursor restatement must remain a separate record |
 | Task recovery | Checkpoint CAS, owner and fencing token; manual takeover | Transactional claim/checkpoint/complete with fencing; document lease/clock policy if added |
 | Outbox and recovery | Commit entry with activation; ack after observed load | Commit activation and outbox atomically, retry delivery idempotently, preserve original success after reply loss |
 | Failed publication | No accepted event/outbox; orphan blobs may remain | No partial committed business state; explicitly handle unreferenced blob cleanup and transaction rollback |

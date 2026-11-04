@@ -49,7 +49,7 @@ All three operations start from the same old receipt. They give three different 
 
 ### Pinned replay
 
-Replay runs the old selection again with the retained input bytes. It does not resolve the latest rule. It needs the same engine build and lifecycle build. If either build is not available, replay fails with `implementation_unavailable`.
+Replay runs the old selection again with the retained input bytes. It does not resolve the latest rule. It needs the same engine build and lifecycle build. If either build is not available, replay fails with `implementation_unavailable`. The replay receipt records `matches_original`. This value is `true` only if the new response bytes are the same as the recorded response bytes. A replay with a different answer is still recorded, with `matches_original` `false`.
 
 Replay does not accept changed inputs. The scenario sends `inputs_json` `{"state":"approved","archived":false}` with the old receipt. The result is `input_mismatch` (`changed-replay-inputs`). Thus replay can not correct a fact.
 

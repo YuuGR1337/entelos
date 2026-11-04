@@ -2,7 +2,7 @@
 
 The host installs actor/role/scope/function/runner/worker context. A request cannot grant itself authority. The local context-file adapter demonstrates that split; another process owned by the same OS user can bypass it. Production authentication, authorization and redaction are application work.
 
-The host also supplies approved source interpretation, independent cases and admission policy. Passing a case set is not evidence that the source is true. A producer cannot submit a passed flag and activate it. Qualification binds its exact snapshot, source, case plan and build before a separate reviewer decision.
+The host also supplies approved source interpretation, independent cases and admission policy. Passing a case set is not evidence that the source is true. A producer cannot submit a passed flag and activate it. Qualification binds its exact snapshot, source, case plan and build before a separate reviewer decision. The host refuses a decision from the producer of the snapshot or the runner of the report with `separation_required`. It compares only the actor names that the host context gives. `load`, `invoke` and restatement also refuse with `implementation_unavailable` if the installed lifecycle build differs from the build in the qualification report.
 
 Dates are supplied explicitly as canonical ISO dates, with half-open intervals and exact scope equality. Replacement/suspension names earlier targets and masks only its own interval. There is no version sort, timestamp tie-breaker or fallback after suspension. New evidence blocks fresh admission on its replaced interval; stopping active content is an explicit operation.
 

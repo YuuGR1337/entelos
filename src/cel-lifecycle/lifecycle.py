@@ -83,7 +83,7 @@ class Host:
             payload={'request':{k:v for k,v in q.items() if k not in ('expected_revision','request_key')},
                      'actor':self.context['actor'],'scope':self.context['scope'],'policy_runner':self.context['runner_actor']}
             return self.store.transact(q['expected_revision'],q['request_key'],payload,lambda v:self.apply(v,op,q))
-        except (KeyError,TypeError,ValueError,UnicodeError) as e:
+        except (KeyError,TypeError,ValueError,UnicodeError,AttributeError) as e:
             raise Fault('invalid_request','invalid or missing field: '+str(e)) from e
     def scoped_record(self,v,ref,kind):return self.owned(v.get(ref,kind))
     def files(self,v,snapshot):
@@ -109,6 +109,10 @@ class Host:
         if not self.source_valid(v,snapshot['source_ref'],snapshot) or not self.plan_valid(v,report['plan_ref'],snapshot):
             raise Fault('stale_qualification','source or cases have been superseded on this interval','admission')
         return report,snapshot
+    def qualified_build(self,v,selection):
+        report=self.scoped_record(v,selection['report_ref'],'qualification')
+        if report['lifecycle_build']!=self.build_ref:
+            raise Fault('implementation_unavailable','installed lifecycle build differs from the qualified build','runtime')
     def events(self,v):
         values=[]
         for ref in v.state['events']:
@@ -148,9 +152,10 @@ class Host:
         snapshot=self.scoped_record(v,selected['snapshot_ref'],'snapshot')
         desc=self.runtime.execute(self.files(v,snapshot),'describe')
         return {'cursor':v.cursor,'selection':selected,'callable':desc}
-    def receipt(self,v,selection,inputs,key,mode,previous='',reason=''):
+    def receipt(self,v,selection,inputs,key,mode,previous='',reason='',original=''):
         snapshot=self.scoped_record(v,selection['snapshot_ref'],'snapshot')
         if self.runtime.build()!=selection['engine_build']:raise Fault('implementation_unavailable','exact replay/execution build unavailable','runtime')
+        self.qualified_build(v,selection)
         files=self.files(v,snapshot)
         self.runtime.execute(files,'describe')
         actual=self.runtime.execute(files,'run',inputs=inputs)
@@ -162,6 +167,7 @@ class Host:
                 'inputs_ref':input_ref,'response_ref':response_ref,'actual_bundle':actual['bundle_ref'],
                 'engine_build':actual['implementation_ref'],'lifecycle_build':self.build_ref,'invocation_id':key,
                 'previous_receipt':previous,'reason':reason}
+        if original:record['matches_original']=response_ref==original
         ref=v.put('receipt',record);v.state['receipts'].append(ref)
         return {'receipt_ref':ref,'receipt':record,'actual':actual}
     def append_event(self,v,event,key):
@@ -239,6 +245,7 @@ class Host:
         if op=='decide':
             report,snapshot=self.report_valid(v,q['report_ref'])
             if not q['reason']:raise Fault('invalid_request','admission reason required')
+            if actor in (snapshot['producer'],report['runner']):raise Fault('separation_required','reviewer must differ from producer and runner','admission')
             item={k:snapshot[k] for k in ['function','scope','from','until']}
             item|={'snapshot_ref':report['snapshot_ref'],'report_ref':q['report_ref'],'actor':actor,'reason':q['reason'],'disposition':'accept','runner_policy':self.context['runner_actor']}
             return {'decision_ref':v.put('decision',item)}
@@ -256,6 +263,7 @@ class Host:
             return self.append_event(v,event,key)
         if op=='load':
             selection=self.resolve(v,q['function'],q['date']);snapshot=self.scoped_record(v,selection['snapshot_ref'],'snapshot')
+            self.qualified_build(v,selection)
             actual=self.runtime.execute(self.files(v,snapshot),'describe')
             if actual['bundle_ref']!=selection['bundle_ref'] or actual['implementation_ref']!=selection['engine_build']:
                 raise Fault('artifact_mismatch','worker loaded a different revision','runtime')
@@ -275,6 +283,7 @@ class Host:
             inputs=v.get_raw(old['inputs_ref'],'application/json')
             if op=='replay':
                 if old['lifecycle_build']!=self.build_ref:raise Fault('implementation_unavailable','exact lifecycle build is unavailable')
+                if 'inputs_json' in q and not isinstance(q['inputs_json'],str):raise Fault('invalid_request','inputs_json must be a JSON string')
                 if 'inputs_json' in q and q['inputs_json'].encode()!=inputs:raise Fault('input_mismatch','replay requires byte-identical retained inputs')
                 selection=old['selection']
             else:
@@ -283,7 +292,7 @@ class Host:
                 if later.cursor==prior or prior not in self.store.history(later.cursor):raise Fault('invalid_cursor','restatement needs an explicit later accepted root')
                 selection=self.resolve(later,old['function'],old['selection']['date'])
             if not q.get('reason'):raise Fault('invalid_request','forensic execution reason required')
-            return self.receipt(v,selection,inputs,key,op,q['receipt_ref'],q['reason'])
+            return self.receipt(v,selection,inputs,key,op,q['receipt_ref'],q['reason'],old['response_ref'] if op=='replay' else '')
         if op=='observe':
             receipt=self.scoped_record(v,q['receipt_ref'],'receipt')
             if q['route'] not in ('source','artifact','contract','test','runtime'):raise Fault('invalid_request','route must name an owner')

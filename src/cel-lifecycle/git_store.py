@@ -31,8 +31,8 @@ def decode(raw):
                          parse_constant=lambda s: (_ for _ in ()).throw(ValueError('non-finite JSON')))
         encode(value)  # Reject unpaired Unicode surrogates as well.
         return value
-    except (ValueError, UnicodeError, TypeError) as e:
-        raise Fault('invalid_record',str(e),'codec') from e
+    except (ValueError, UnicodeError, TypeError, RecursionError) as e:
+        raise Fault('invalid_record',str(e) or 'JSON nesting is too deep','codec') from e
 
 def media(kind): return 'application/vnd.cel-lifecycle.'+kind+'+json'
 def content_ref(envelope): return 'sha256:'+hashlib.sha256(envelope).hexdigest()
