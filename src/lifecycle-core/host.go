@@ -87,12 +87,24 @@ func Implementation() (string, error) {
 type Host struct {
 	Store    Store
 	Runtime  Runtime
+	Runner   Runner
 	Context  Object
 	BuildRef string
 }
 
-// NewHost checks the trusted host context.
+// NewHost checks the trusted host context. The CEL runner of rt qualifies
+// the candidates.
 func NewHost(store Store, rt Runtime, context any) (*Host, error) {
+	return NewHostWithRunner(store, rt, &CELRunner{Runtime: rt}, context)
+}
+
+// NewHostWithRunner checks the trusted host context. The runner qualifies
+// the candidates. The embedding host installs the runner, the same as the
+// roles. A request never selects it.
+func NewHostWithRunner(store Store, rt Runtime, runner Runner, context any) (*Host, error) {
+	if runner == nil {
+		return nil, NewFault("configuration_error", "host runner is required", "")
+	}
 	ctx, ok := context.(Object)
 	if !ok {
 		return nil, NewFault("configuration_error", "host context must be an object", "")
@@ -123,7 +135,7 @@ func NewHost(store Store, rt Runtime, context any) (*Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Host{Store: store, Runtime: rt, Context: ctx, BuildRef: build}, nil
+	return &Host{Store: store, Runtime: rt, Runner: runner, Context: ctx, BuildRef: build}, nil
 }
 
 func (h *Host) ctx(name string) string { return h.Context[name].(string) }
@@ -344,8 +356,17 @@ func (h *Host) reportValid(v *View, ref any) (Object, Object) {
 	if !equal(item(report, "runner"), h.ctx("runner_actor")) {
 		fail("untrusted_runner", "report is not from the installed runner", "admission")
 	}
-	if !equal(item(report, "lifecycle_build"), h.BuildRef) || !equal(item(report, "engine_build"), must(h.Runtime.Build())) {
+	if !equal(item(report, "lifecycle_build"), h.BuildRef) || !equal(item(report, "engine_build"), must(h.Runner.Identity())) {
 		fail("implementation_unavailable", "qualification build is not installed", "admission")
+	}
+	// Check the bindings again. The verdict must name the bytes of this
+	// snapshot and the runner identity of this report. Thus a passed flag
+	// never moves to other bytes or to another runner.
+	outcome := item(report, "outcome")
+	if !equal(lookupAny(outcome, "bundle_ref"), item(snapshot, "bundle_ref")) ||
+		!equal(lookupAny(outcome, "implementation_ref"), item(report, "engine_build")) ||
+		!equal(item(report, "engine_build"), h.Runner.Expected(candidate(item(report, "snapshot_ref"), snapshot))) {
+		fail("qualification_failed", "the exact report did not pass", "admission")
 	}
 	if !h.sourceValid(v, item(snapshot, "source_ref"), snapshot) || !h.planValid(v, item(report, "plan_ref"), snapshot) {
 		fail("stale_qualification", "source or cases have been superseded on this interval", "admission")
@@ -660,20 +681,24 @@ func (h *Host) apply(v *View, op string, q Object) any {
 		snapshot := h.scoped(v, item(q, "snapshot_ref"), "snapshot")
 		plan := h.scoped(v, item(q, "plan_ref"), "plan")
 		applicable := h.sourceValid(v, item(snapshot, "source_ref"), snapshot) && h.planValid(v, q["plan_ref"], snapshot)
+		c := candidate(q["snapshot_ref"], snapshot)
+		expected := h.Runner.Expected(c)
 		var outcome, diagnostic any
 		if applicable {
-			outcome, diagnostic = h.check(v, snapshot, item(plan, "cases"))
+			outcome, diagnostic = h.check(v, snapshot, c, item(plan, "cases"))
 		}
+		// The Host sets the status from the verdict and the bindings. The
+		// runner cannot pass a candidate or a runner that it did not name.
 		status := "failed"
 		switch {
 		case !applicable || truthy(diagnostic):
 			status = "unresolved"
 		case equal(lookup(outcome, "status", nil), "passed") && equal(lookup(outcome, "bundle_ref", nil), item(snapshot, "bundle_ref")) &&
-			equal(lookup(outcome, "implementation_ref", nil), item(snapshot, "engine_build")):
+			equal(lookup(outcome, "implementation_ref", nil), expected):
 			status = "passed"
 		}
 		report := merge(pick(snapshot, interval4...), Object{"snapshot_ref": q["snapshot_ref"], "source_ref": snapshot["source_ref"], "plan_ref": q["plan_ref"],
-			"runner": actor, "engine_build": item(snapshot, "engine_build"), "lifecycle_build": h.BuildRef,
+			"runner": actor, "engine_build": expected, "lifecycle_build": h.BuildRef,
 			"status": status, "source_and_plan_applicable": applicable, "outcome": outcome, "diagnostic": diagnostic})
 		return Object{"report_ref": v.Put("qualification", report), "report": report}
 	case "decide":
@@ -842,9 +867,9 @@ func (h *Host) apply(v *View, op string, q Object) any {
 	return nil
 }
 
-// check runs the qualification cases. A runtime fault is a diagnostic, not
-// an error of the request.
-func (h *Host) check(v *View, snapshot Object, cases any) (outcome, diagnostic any) {
+// check runs the qualification cases on the installed runner. A runner fault
+// is a diagnostic, not an error of the request.
+func (h *Host) check(v *View, snapshot Object, c Candidate, cases any) (outcome, diagnostic any) {
 	defer func() {
 		if r := recover(); r != nil {
 			fault, ok := r.(*Fault)
@@ -854,5 +879,6 @@ func (h *Host) check(v *View, snapshot Object, cases any) (outcome, diagnostic a
 			outcome, diagnostic = nil, fault.Record()
 		}
 	}()
-	return must(h.Runtime.Execute(h.files(v, snapshot), "check", nil, cases)), nil
+	verdict := must(h.Runner.Qualify(QualificationInput{Candidate: c, Files: h.files(v, snapshot), Cases: cases}))
+	return verdict.Outcome, nil
 }
