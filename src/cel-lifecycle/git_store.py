@@ -61,7 +61,7 @@ class View:
         else:
             oid=self.entries.get('o-'+ref[7:])
             if not oid: raise Fault('artifact_unavailable',ref,'store')
-            body=self.store.git('cat-file','blob',oid)
+            body=self.store.blob(oid)
         if content_ref(body)!=ref or b'\0' not in body:
             raise Fault('artifact_mismatch','content bytes differ from reference','store')
         actual,raw=body.split(b'\0',1)
@@ -91,6 +91,7 @@ class GitStore:
         if proc.returncode and not allow_fail:
             raise Fault('store_error',proc.stderr.decode(errors='replace'),'store')
         return proc if allow_fail else proc.stdout
+    def blob(self,oid):return self.git('cat-file','blob',oid)
     def root(self):
         p=self.git('rev-parse','--verify',ROOT_REF,allow_fail=True)
         return '' if p.returncode else p.stdout.decode().strip()

@@ -1,0 +1,114 @@
+{
+ "format": "storage-port-vector/v1",
+ "id": "stale-cas-rejected",
+ "description": "A transaction with an expected cursor that is not the current cursor fails before apply runs.",
+ "invariants": [
+  "stale_cas_rejection",
+  "no_partial_state_after_failure"
+ ],
+ "steps": [
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "key-1",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 1
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [],
+    "result": "one"
+   },
+   "expect": {
+    "reused": false,
+    "result": "one",
+    "apply_calls": 1,
+    "bind": "c1"
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "key-2",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 2
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [
+     {
+      "put": "note",
+      "value": {
+       "note": "beta",
+       "n": 2
+      },
+      "expect_ref": "sha256:34ace7c87146a15a553172878f3ee94ed9d09597b285768b69ced8d29117a1a4"
+     }
+    ],
+    "result": "two"
+   },
+   "expect": {
+    "error": "stale_revision",
+    "apply_calls": 0
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "cursor-that-does-not-exist",
+   "key": "key-3",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 2
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [],
+    "result": "three"
+   },
+   "expect": {
+    "error": "stale_revision",
+    "apply_calls": 0
+   }
+  },
+  {
+   "op": "read",
+   "actions": [
+    {
+     "get": "sha256:34ace7c87146a15a553172878f3ee94ed9d09597b285768b69ced8d29117a1a4",
+     "kind": "note",
+     "expect": {
+      "error": "artifact_unavailable"
+     }
+    }
+   ],
+   "expect": {
+    "cursor": "$c1",
+    "state_includes": {
+     "requests": {
+      "key-1": {
+       "payload_ref": "sha256:bae07b9933175d172036169fca3d2891aefd6dcaa448f87f94ee7b4ae1dd4417",
+       "result": "one"
+      }
+     }
+    }
+   }
+  },
+  {
+   "op": "history",
+   "cursor": "$c1",
+   "expect": {
+    "cursors": [
+     "$c1"
+    ]
+   }
+  }
+ ]
+}

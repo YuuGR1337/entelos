@@ -1,0 +1,91 @@
+{
+ "format": "storage-port-vector/v1",
+ "id": "request-key-bounds",
+ "description": "A request key must be a nonempty string of 128 characters or fewer.",
+ "invariants": [
+  "idempotent_success",
+  "no_partial_state_after_failure"
+ ],
+ "steps": [
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 1
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [],
+    "result": "x"
+   },
+   "expect": {
+    "error": "invalid_request",
+    "apply_calls": 0
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 1
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [],
+    "result": "x"
+   },
+   "expect": {
+    "error": "invalid_request",
+    "apply_calls": 0
+   }
+  },
+  {
+   "op": "read",
+   "expect": {
+    "cursor": "",
+    "state": {
+     "schema": "local-lifecycle/v1",
+     "heads": {},
+     "sources": [],
+     "plans": [],
+     "events": [],
+     "requests": {},
+     "workers": {},
+     "receipts": [],
+     "tasks": {},
+     "outbox": {}
+    }
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 1
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [],
+    "result": "x"
+   },
+   "expect": {
+    "reused": false,
+    "result": "x",
+    "apply_calls": 1,
+    "bind": "c1"
+   }
+  }
+ ]
+}

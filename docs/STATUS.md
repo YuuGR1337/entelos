@@ -98,6 +98,8 @@ These are the limits of the M4 result:
 
 On 2026-11-05, the maintainer approved the M6 scope in issue #77. The technology decision (#85) comes first, and the maintainer makes it. The protocol (#83) and the sidecar (#84) wait for that decision. The specs and vectors for #78 to #81 are language-neutral.
 
+Issue #79 adds a storage port spec, 11 JSON storage vectors and an in-memory adapter. The Git adapter and the in-memory adapter pass all vectors. `verify.py` runs them as the `storage-vectors` check. The vectors do not show durability or performance.
+
 Keep caller walkthrough and input-correction documentation bounded to the existing examples. Numeric/structured profiles, production DBs, authentication gateways and resident-worker coordination are outside the current implemented scope.
 
 ## Handoff rule

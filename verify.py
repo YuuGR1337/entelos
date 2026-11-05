@@ -79,6 +79,10 @@ try:
  boundaries=run('export-boundaries',[sys.executable,'-B',ROOT/'tests/test_export_boundaries.py'])
  boundary_results=json.loads((w/'boundaries/test-results.json').read_text())
  check('export-boundaries','Do oversized stream and audit-identity regressions pass?',boundaries.returncode==0 and boundary_results['successful'],boundary_results)
+ storage=run('storage-vectors',[sys.executable,'-B',ROOT/'src/cel-lifecycle/test_storage_port.py','--work',w/'storage'])
+ storage_path=w/'storage/test-results.json';storage_results=json.loads(storage_path.read_text()) if storage_path.exists() else {'successful':False,'error':'test_storage_port.py wrote no test-results.json','stderr':storage.stderr}
+ check('storage-vectors','Do the Git and in-memory adapters pass every storage port vector?',storage.returncode==0 and storage_results['successful'] and set(storage_results.get('summary',{}))=={'git','memory'},
+       {'exit_code':storage.returncode,'vectors':storage_results.get('vectors'),'summary':storage_results.get('summary'),'problems':storage_results.get('problems'),'stderr':storage.stderr})
  tests=run('lifecycle-tests',[sys.executable,'-B',ROOT/'src/cel-lifecycle/test_lifecycle.py'])
  test_results=json.loads((w/'conformance/test-results.json').read_text())
  check('lifecycle','Do local lifecycle/concurrency/recovery/replay checks pass from the export alone?',tests.returncode==0 and test_results['successful'],test_results)

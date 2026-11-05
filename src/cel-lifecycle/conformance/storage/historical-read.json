@@ -1,0 +1,222 @@
+{
+ "format": "storage-port-vector/v1",
+ "id": "historical-read",
+ "description": "A read at an old cursor returns the state and content of that cursor only. An unknown cursor fails.",
+ "invariants": [
+  "stable_historical_read",
+  "immutable_content_identity"
+ ],
+ "steps": [
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "key-1",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 1
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [
+     {
+      "put": "note",
+      "value": {
+       "note": "alpha",
+       "n": 1
+      },
+      "expect_ref": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6"
+     },
+     {
+      "set": [
+       "heads",
+       "example.alpha"
+      ],
+      "value": 1
+     }
+    ],
+    "result": 1
+   },
+   "expect": {
+    "reused": false,
+    "result": 1,
+    "apply_calls": 1,
+    "bind": "c1"
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "$c1",
+   "key": "key-2",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 2
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [
+     {
+      "put": "note",
+      "value": {
+       "note": "beta",
+       "n": 2
+      },
+      "expect_ref": "sha256:34ace7c87146a15a553172878f3ee94ed9d09597b285768b69ced8d29117a1a4"
+     },
+     {
+      "set": [
+       "heads",
+       "example.alpha"
+      ],
+      "value": 2
+     }
+    ],
+    "result": 2
+   },
+   "expect": {
+    "reused": false,
+    "result": 2,
+    "apply_calls": 1,
+    "bind": "c2"
+   }
+  },
+  {
+   "op": "read",
+   "cursor": "$c1",
+   "actions": [
+    {
+     "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+     "kind": "note",
+     "expect": {
+      "value": {
+       "note": "alpha",
+       "n": 1
+      }
+     }
+    },
+    {
+     "get": "sha256:34ace7c87146a15a553172878f3ee94ed9d09597b285768b69ced8d29117a1a4",
+     "kind": "note",
+     "expect": {
+      "error": "artifact_unavailable"
+     }
+    }
+   ],
+   "expect": {
+    "cursor": "$c1",
+    "state_includes": {
+     "heads": {
+      "example.alpha": 1
+     }
+    }
+   }
+  },
+  {
+   "op": "read",
+   "cursor": "$c2",
+   "actions": [
+    {
+     "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+     "kind": "note",
+     "expect": {
+      "value": {
+       "note": "alpha",
+       "n": 1
+      }
+     }
+    },
+    {
+     "get": "sha256:34ace7c87146a15a553172878f3ee94ed9d09597b285768b69ced8d29117a1a4",
+     "kind": "note",
+     "expect": {
+      "value": {
+       "note": "beta",
+       "n": 2
+      }
+     }
+    }
+   ],
+   "expect": {
+    "cursor": "$c2",
+    "state_includes": {
+     "heads": {
+      "example.alpha": 2
+     }
+    }
+   }
+  },
+  {
+   "op": "read",
+   "expect": {
+    "cursor": "$c2",
+    "state_includes": {
+     "heads": {
+      "example.alpha": 2
+     }
+    }
+   }
+  },
+  {
+   "op": "read",
+   "cursor": "",
+   "expect": {
+    "cursor": "",
+    "state": {
+     "schema": "local-lifecycle/v1",
+     "heads": {},
+     "sources": [],
+     "plans": [],
+     "events": [],
+     "requests": {},
+     "workers": {},
+     "receipts": [],
+     "tasks": {},
+     "outbox": {}
+    }
+   }
+  },
+  {
+   "op": "history",
+   "cursor": "$c2",
+   "expect": {
+    "cursors": [
+     "$c2",
+     "$c1"
+    ]
+   }
+  },
+  {
+   "op": "history",
+   "cursor": "$c1",
+   "expect": {
+    "cursors": [
+     "$c1"
+    ]
+   }
+  },
+  {
+   "op": "read",
+   "cursor": "unknown-cursor",
+   "expect": {
+    "error": "unknown_cursor"
+   }
+  },
+  {
+   "op": "read",
+   "cursor": "ffffffffffffffffffffffffffffffffffffffff",
+   "expect": {
+    "error": "unknown_cursor"
+   }
+  },
+  {
+   "op": "read",
+   "cursor": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+   "expect": {
+    "error": "unknown_cursor"
+   }
+  }
+ ]
+}
