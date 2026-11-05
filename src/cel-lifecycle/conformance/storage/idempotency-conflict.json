@@ -1,0 +1,96 @@
+{
+ "format": "storage-port-vector/v1",
+ "id": "idempotency-conflict",
+ "description": "A request with a used key and a different payload fails. The stored request record does not change.",
+ "invariants": [
+  "idempotent_success",
+  "no_partial_state_after_failure"
+ ],
+ "steps": [
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "key-1",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 1
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [],
+    "result": "first"
+   },
+   "expect": {
+    "reused": false,
+    "result": "first",
+    "apply_calls": 1,
+    "bind": "c1"
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "$c1",
+   "key": "key-1",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 2
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [],
+    "result": "second"
+   },
+   "expect": {
+    "error": "idempotency_conflict",
+    "apply_calls": 0
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "key-1",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 2
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [],
+    "result": "second"
+   },
+   "expect": {
+    "error": "idempotency_conflict",
+    "apply_calls": 0
+   }
+  },
+  {
+   "op": "read",
+   "expect": {
+    "cursor": "$c1",
+    "state_includes": {
+     "requests": {
+      "key-1": {
+       "payload_ref": "sha256:bae07b9933175d172036169fca3d2891aefd6dcaa448f87f94ee7b4ae1dd4417",
+       "result": "first"
+      }
+     }
+    }
+   }
+  },
+  {
+   "op": "history",
+   "cursor": "$c1",
+   "expect": {
+    "cursors": [
+     "$c1"
+    ]
+   }
+  }
+ ]
+}
