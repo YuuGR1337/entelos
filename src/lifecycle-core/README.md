@@ -10,6 +10,7 @@ This module is a Go port of the reference lifecycle Host in `src/cel-lifecycle/`
 - `memstore.go`: an in-memory adapter with the same publication contract. It is not durable.
 - `canon.go`: the record codec. It gives the same bytes as the Python codec.
 - `runtime.go`: the CEL adapter. It calls the pinned `cel-handoff` executable, the same as the Python core.
+- `runner.go`: the qualification runner contract. [RUNNER.md](RUNNER.md) is the spec. `CELRunner` is the first runner.
 - `cmd/lifecycle-core`: the JSONL host. It has the same arguments and wire form as `cli.py`.
 - `tools/parity.py`: runs the lifecycle scenario on both cores and compares the traces.
 
