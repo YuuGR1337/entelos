@@ -396,6 +396,7 @@
   {
    "name": "stream-two-frames",
    "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d",
+   "operation": "inspect",
    "expect": {
     "responses": [
      {
@@ -445,6 +446,7 @@
    "name": "stream-reads-1-byte",
    "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d",
    "read_size": 1,
+   "operation": "inspect",
    "expect": {
     "responses": [
      {
@@ -494,6 +496,7 @@
    "name": "stream-reads-3-bytes",
    "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d",
    "read_size": 3,
+   "operation": "inspect",
    "expect": {
     "responses": [
      {
@@ -523,6 +526,7 @@
    "name": "stream-short-read-truncated",
    "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d000000467b22626f64",
    "read_size": 2,
+   "operation": "inspect",
    "expect": {
     "responses": [
      {
@@ -617,8 +621,120 @@
    }
   },
   {
+   "name": "stream-writes-3-bytes",
+   "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d",
+   "write_size": 3,
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     },
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "stream-writes-1-byte",
+   "stream_hex": "000001",
+   "write_size": 1,
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "",
+      "status": "invalid_frame",
+      "diagnostic": {
+       "code": "invalid_frame",
+       "stage": "protocol",
+       "message": {
+        "$type": "string"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "duplicate-surrogate-key",
+   "payload_text": "{\"\\ud800\":0,\"\\ud800\":1}",
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "stream-duplicate-surrogate-key",
+   "stream_hex": "000000177b225c7564383030223a302c225c7564383030223a317d",
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "",
+      "status": "invalid_request",
+      "diagnostic": {
+       "code": "invalid_request",
+       "stage": "protocol",
+       "message": {
+        "$type": "string"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
    "name": "stream-truncated-header",
    "stream_hex": "000001",
+   "operation": "inspect",
    "expect": {
     "responses": [
      {
@@ -639,6 +755,7 @@
   {
    "name": "stream-oversized",
    "stream_hex": "001000017b7d",
+   "operation": "inspect",
    "expect": {
     "responses": [
      {
@@ -659,6 +776,7 @@
   {
    "name": "stream-truncated-payload",
    "stream_hex": "0000000a7b7d",
+   "operation": "inspect",
    "expect": {
     "responses": [
      {
@@ -679,6 +797,7 @@
   {
    "name": "stream-empty-frame-closes",
    "stream_hex": "00000000000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d",
+   "operation": "inspect",
    "expect": {
     "responses": [
      {

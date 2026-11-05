@@ -46,7 +46,7 @@ def parse(raw):
     def pairs(items):
         result={}
         for k,v in items:
-            if k in result:raise ValueError('duplicate JSON key: '+k)
+            if k in result:raise ValueError('duplicate JSON key: '+json.dumps(k))
             result[k]=v
         return result
     def no_float(text):raise ValueError('numbers must be integers')
@@ -115,6 +115,7 @@ class Adapter:
         except ProtocolError as e:return failure(request_id,e.code,'protocol',e.message)
         try:result=self.host.handle({'op':op,**request['body']})
         except Fault as e:return failure(request_id,e.code,e.stage,e.message)
+        except Exception:return internal(request_id)
         return {'protocol':PROTOCOL,'request_id':request_id,'status':'ok','result':result}
     def frame(self,payload):
         """Return (response object, close) for one frame payload."""
@@ -145,14 +146,29 @@ def read_exact(reader,size):
         chunks.append(chunk);count+=len(chunk)
     return b''.join(chunks)
 
+def internal(request_id):
+    """The Host failed with an exception that is not a Fault. The message has no exception text."""
+    return failure(request_id,'internal_error','host','the host failed with an unexpected error')
+
 def failure(request_id,code,stage,message):
+    # Each part of a diagnostic must encode as UTF-8. A lone surrogate becomes a backslash escape.
+    message=str(message).encode('utf-8','backslashreplace').decode('utf-8')
     if len(message)>MAX_MESSAGE:message=message[:MAX_MESSAGE-3]+'...'
     return {'protocol':PROTOCOL,'request_id':request_id,'status':code,'diagnostic':{'code':code,'stage':stage,'message':message}}
 
 def limit(response):
-    """If the canonical response exceeds the frame bound, return a response_too_large failure."""
-    if len(canonical(response))<=MAX_FRAME:return response
+    """Return a response that encodes and is in the frame bound.
+    A result outside the value domain gives internal_error. A result over the bound gives response_too_large."""
+    try:size=len(canonical(response))
+    except (ValueError,UnicodeError,RecursionError):return internal(response.get('request_id',''))
+    if size<=MAX_FRAME:return response
     return failure(response.get('request_id',''),'response_too_large','protocol','the response exceeds the frame byte bound')
 
 def write_frame(writer,response):
-    body=canonical(limit(response));writer.write(struct.pack('>I',len(body))+body);writer.flush()
+    """Write one complete frame. A short write is followed by another write of the remaining bytes."""
+    body=canonical(limit(response));data=memoryview(struct.pack('>I',len(body))+body)
+    while data:
+        count=writer.write(data)
+        if count is None or count<=0:raise OSError('the writer accepted no bytes')
+        data=data[count:]
+    writer.flush()
