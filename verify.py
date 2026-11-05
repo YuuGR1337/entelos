@@ -91,12 +91,14 @@ try:
  if go_core[0].returncode==0:
   go_core.append(run('go-core-parity',[sys.executable,'-B',core/'tools/parity.py','--work',w/'go-core','--runtime',w/'bin/cel-handoff','--bundle',w/'record-bundle','--fixture',env['LIFECYCLE_FIXTURE'],'--host',w/'bin/lifecycle-core']))
  parity_path=w/'go-core/parity.json';parity=json.loads(parity_path.read_text()) if parity_path.exists() else {'status':'failed'}
- if parity['status']=='passed':
-  env.update(LIFECYCLE_GO_BASELINE=str(parity_path),LIFECYCLE_GO_REQUIRE_BASELINE='1')
-  go_core.append(run('go-core-tests',['go','test','-mod=readonly','-count=1','./...'],core))
-  go_core.append(run('go-core-vet',['go','vet','-mod=readonly','./...'],core))
+ # Run the tests and vet also after a parity failure, so that the evidence is complete.
+ # The host tests need the parity repository; without it they fail, because the baseline is required.
+ env.update(LIFECYCLE_GO_REQUIRE_BASELINE='1')
+ if parity_path.exists():env.update(LIFECYCLE_GO_BASELINE=str(parity_path))
+ go_core.append(run('go-core-tests',['go','test','-mod=readonly','-count=1','./...'],core))
+ go_core.append(run('go-core-vet',['go','vet','-mod=readonly','./...'],core))
  check('go-lifecycle-core','Does the Go lifecycle core build, match the Python core on the scenario, and pass its tests and vet?',
-       len(go_core)==4 and all(x.returncode==0 for x in go_core),
+       parity['status']=='passed' and len(go_core)==4 and all(x.returncode==0 for x in go_core),
        {'stages':{c['name']:c['exit_code'] for c in commands[-len(go_core):]},
         'parity':{k:parity.get(k) for k in ['status','steps','first_difference','same_snapshot_refs']}})
  protocol=run('protocol-vectors',[sys.executable,'-B',ROOT/'src/protocol/test_protocol.py'])

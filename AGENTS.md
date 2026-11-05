@@ -10,7 +10,7 @@ For contract, lifecycle, integration or reproduction work, read `.agents/skills/
 
 ## Layout
 
-- `src/`: the reusable reference (`cel-handoff` Go host, `cel-lifecycle` Python lifecycle).
+- `src/`: the reusable reference (`cel-handoff` Go host, `cel-lifecycle` Python lifecycle, `lifecycle-core` Go port of the lifecycle, `protocol` wire protocol).
 - `examples/`: consumer examples that reuse `src/` without copies.
 - `tests/`: cross-component boundary tests.
 - `tools/`: project checks, change classification, PR gates and cross-harness review.

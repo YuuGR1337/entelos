@@ -165,7 +165,11 @@ func reuse(store Store, view *View, key, digest string) (Object, bool, error) {
 		if err != nil {
 			return nil, true, err
 		}
-		if _, has := older.State["requests"].(Object)[key]; !has {
+		requests, ok := older.State["requests"].(Object)
+		if !ok {
+			return nil, true, NewFault("invalid_store", "missing requests", "store")
+		}
+		if _, has := requests[key]; !has {
 			break
 		}
 		origin = cursor

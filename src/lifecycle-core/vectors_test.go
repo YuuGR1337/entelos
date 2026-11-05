@@ -272,3 +272,14 @@ func TestStoragePortVectors(t *testing.T) {
 		})
 	}
 }
+
+// A harness abort keeps the mismatches that came before it.
+func TestVectorAbortKeepsEarlierMismatches(t *testing.T) {
+	got := runVector(NewMemoryStore(), Object{"steps": Array{
+		Object{"op": "read", "expect": Object{"cursor": "not-empty"}},
+		Object{"op": "unknown", "expect": Object{}},
+	}})
+	if len(got) != 2 || !strings.HasPrefix(got[0], "steps[0].cursor") || !strings.HasPrefix(got[1], "harness:") {
+		t.Fatalf("got %q", got)
+	}
+}

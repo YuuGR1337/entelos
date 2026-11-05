@@ -33,6 +33,20 @@ type GitStore struct {
 	Hook func(store *GitStore, args []string, data []byte) (GitResult, error)
 }
 
+// gitEnvironment is the process environment without GIT_* variables, plus a
+// fixed Git configuration and identity.
+func gitEnvironment() []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		if !strings.HasPrefix(kv, "GIT_") {
+			env = append(env, kv)
+		}
+	}
+	return append(env, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_TERMINAL_PROMPT=0",
+		"GIT_AUTHOR_NAME=Local lifecycle", "GIT_AUTHOR_EMAIL=lifecycle@example.invalid",
+		"GIT_COMMITTER_NAME=Local lifecycle", "GIT_COMMITTER_EMAIL=lifecycle@example.invalid")
+}
+
 // OpenGitStore opens or makes a dedicated bare repository.
 func OpenGitStore(path string) (*GitStore, error) {
 	abs, err := filepath.Abs(path)
@@ -42,15 +56,7 @@ func OpenGitStore(path string) (*GitStore, error) {
 	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
 		abs = resolved
 	}
-	s := &GitStore{Path: abs}
-	for _, kv := range os.Environ() {
-		if !strings.HasPrefix(kv, "GIT_") {
-			s.env = append(s.env, kv)
-		}
-	}
-	s.env = append(s.env, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_TERMINAL_PROMPT=0",
-		"GIT_AUTHOR_NAME=Local lifecycle", "GIT_AUTHOR_EMAIL=lifecycle@example.invalid",
-		"GIT_COMMITTER_NAME=Local lifecycle", "GIT_COMMITTER_EMAIL=lifecycle@example.invalid")
+	s := &GitStore{Path: abs, env: gitEnvironment()}
 	if _, err := os.Stat(abs); errors.Is(err, os.ErrNotExist) {
 		if err := os.MkdirAll(filepath.Dir(abs), 0o777); err != nil {
 			return nil, err

@@ -397,7 +397,11 @@ func TestHostOnTheMemoryStoreGivesTheGitAnswers(t *testing.T) {
 				v.pending["sha256:"+name[2:]] = body
 			}
 		}
-		v.State = copyObject(view.State)
+		state, err := Decode(Encode(view.State))
+		if err != nil {
+			return nil, err
+		}
+		v.State = state.(Object)
 		return nil, nil
 	}); err != nil {
 		t.Fatal(err)
@@ -424,5 +428,10 @@ func TestHostOnTheMemoryStoreGivesTheGitAnswers(t *testing.T) {
 		"expected_revision": root.Cursor, "request_key": "memory-replay"}))
 	if replay["result"].(Object)["receipt"].(Object)["matches_original"] != true {
 		t.Fatal(replay)
+	}
+	// The memory writes must not reach the Git view that gave the import.
+	fresh, _ := f.store.Read(nil)
+	if !equal(view.State, fresh.State) {
+		t.Fatal("the memory store shares state with the Git view")
 	}
 }

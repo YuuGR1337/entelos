@@ -481,8 +481,19 @@ func ContentRef(envelope []byte) string {
 // equal gives Python equality for decoded JSON values: bool compares as an
 // integer, and an integer compares exactly with a float.
 func equal(a, b any) bool {
+	// Encode accepts []string as an array, so equal does too.
+	a, b = asArray(a), asArray(b)
 	an, aNum := number(a)
 	bn, bNum := number(b)
+	// A non-finite float has no rational value. Compare it as a float, as
+	// Python does: NaN equals nothing and an infinity equals only itself.
+	if x, ok := a.(float64); ok && (math.IsInf(x, 0) || math.IsNaN(x)) {
+		y, ok := b.(float64)
+		return ok && x == y
+	}
+	if y, ok := b.(float64); ok && (math.IsInf(y, 0) || math.IsNaN(y)) {
+		return false
+	}
 	if aNum && bNum {
 		return an.Cmp(bn) == 0
 	}
@@ -517,6 +528,17 @@ func equal(a, b any) bool {
 		return true
 	}
 	return false
+}
+
+func asArray(v any) any {
+	if list, ok := v.([]string); ok {
+		out := make(Array, len(list))
+		for i, s := range list {
+			out[i] = s
+		}
+		return out
+	}
+	return v
 }
 
 func number(v any) (*big.Rat, bool) {

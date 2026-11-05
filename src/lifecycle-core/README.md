@@ -23,8 +23,7 @@ The `go-lifecycle-core` check in `verify.py` does these steps:
 
 1. Build `cmd/lifecycle-core`.
 2. Run `tools/parity.py` on `src/cel-lifecycle/fixtures/lifecycle-scenario.json`.
-3. Run `go test` with the Git repository that the parity run made.
-4. Run `go vet`.
+3. Run `go test` and `go vet`, also if parity failed. The Host tests in `host_test.go` start from a copy of the Git repository that step 2 made with the Go host. `LIFECYCLE_GO_BASELINE` names that run's `parity.json`. The Host tests use the repository only if parity passed, which shows that the Go trace equals the Python trace. If parity failed or did not run, the Host tests fail.
 
 `vectors_test.go` runs each storage port vector in `src/cel-lifecycle/conformance/storage/` on a new Git store and a new in-memory store.
 

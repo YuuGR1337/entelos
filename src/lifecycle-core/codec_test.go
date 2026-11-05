@@ -1,6 +1,9 @@
 package lifecycle
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 // The expected bytes are the output of the Python reference codec
 // (src/cel-lifecycle/git_store.py encode(decode(input))), recorded once.
@@ -58,5 +61,15 @@ func TestEqualityFollowsTheReference(t *testing.T) {
 	b, _ := Decode([]byte(`{"x":[1.0,{"y":1}]}`))
 	if !equal(a, b) {
 		t.Fatal("nested equality differs from the reference")
+	}
+}
+
+func TestEqualityOfNonFiniteFloatsAndStringLists(t *testing.T) {
+	nan, inf := math.NaN(), math.Inf(1)
+	if equal(nan, nan) || equal(nan, Int{"1"}) || equal(Int{"1"}, inf) || !equal(inf, inf) || equal(inf, math.Inf(-1)) {
+		t.Fatal("non-finite floats differ from the Python rules")
+	}
+	if !equal([]string{"a", "b"}, Array{"a", "b"}) || !equal(Array{"a"}, []string{"a"}) || equal([]string{"a"}, Array{"b"}) {
+		t.Fatal("a []string must equal the Array with the same items")
 	}
 }

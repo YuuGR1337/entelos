@@ -279,3 +279,36 @@ func TestReadBytesAreACopy(t *testing.T) {
 		}
 	})
 }
+
+// A history root without a requests object is a store fault, not a panic.
+func TestReuseRefusesAHistoryRootWithoutRequests(t *testing.T) {
+	s := NewMemoryStore()
+	commit := func(id, parent string, state Object) {
+		body := Envelope(Media("state"), Encode(state))
+		s.objects[ContentRef(body)] = body
+		s.commits[id] = memoryCommit{parent: parent, entries: map[string]string{"state.json": ContentRef(body)}}
+		s.root = id
+	}
+	broken := EmptyState()
+	delete(broken, "requests")
+	commit("c1", "", broken)
+	current := EmptyState()
+	current["requests"] = Object{"a": Object{"payload_ref": requestDigest(Object{}), "result": nil}}
+	commit("c2", "c1", current)
+	if _, err := s.Transact("", "a", Object{}, nil); code(err) != "invalid_store" {
+		t.Fatalf("got %v", err)
+	}
+}
+
+// A media type that is not UTF-8 is a request error, as in the Python
+// reference: there, bytes.decode raises UnicodeDecodeError and the Host maps
+// it to invalid_request.
+func TestNonUTF8MediaTypeFollowsTheReference(t *testing.T) {
+	view := root(t, NewMemoryStore())
+	ref := view.PutRaw("\xff", []byte("x"))
+	if _, err := view.GetRaw(ref, "text/plain"); err == nil {
+		t.Fatal("no error")
+	} else if _, ok := err.(*requestError); !ok {
+		t.Fatalf("got %T %v", err, err)
+	}
+}

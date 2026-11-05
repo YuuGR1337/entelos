@@ -73,7 +73,9 @@ func Implementation() (string, error) {
 		body = append(append(append(append(body, name...), 0), raw...), 0)
 	}
 	body = append(body, runtime.Version()...)
-	git, err := exec.Command("git", "--version").Output()
+	cmd := exec.Command("git", "--version")
+	cmd.Env = gitEnvironment()
+	git, err := cmd.Output()
 	if err != nil {
 		return "", NewFault("configuration_error", "git is unavailable: "+err.Error(), "")
 	}
