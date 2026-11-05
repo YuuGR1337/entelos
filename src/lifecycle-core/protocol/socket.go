@@ -10,6 +10,7 @@ import (
 	"os"
 	"sync"
 	"syscall"
+	"time"
 )
 
 // MaxSocketPath is the longest socket path that Listen accepts, in bytes. The
@@ -18,14 +19,19 @@ import (
 // directory and give a relative path.
 const MaxSocketPath = 103
 
+// LockWait is the longest time that Listen waits for the start lock.
+const LockWait = 10 * time.Second
+
 // Listen makes a Unix domain socket at path with file mode 0600. If the path
 // exists, Listen removes it only if it is a stale socket: a socket file with
 // no listener. Listen refuses any other file and a socket with a listener.
 //
-// Listen holds an exclusive lock on the file path+".lock" during the stale
-// check, the removal and the bind. Thus two sidecars that start at the same
-// time cannot both see one stale socket, and the second one cannot remove
-// the live socket of the first one. The lock file stays after Listen.
+// Listen holds an exclusive lock on the file path+".lock" only during the
+// stale check, the removal and the bind. Thus two sidecars that start at the
+// same time cannot both see one stale socket, and the second one cannot
+// remove the live socket of the first one. The lock file stays after Listen.
+// Listen refuses a lock file that is not a regular file of the current user.
+// If it cannot get the lock in LockWait, Listen fails.
 func Listen(path string) (*net.UnixListener, error) {
 	if len(path) > MaxSocketPath {
 		return nil, fmt.Errorf("socket path is longer than %d bytes: start the sidecar in the socket directory and give a relative path", MaxSocketPath)
@@ -35,8 +41,30 @@ func Listen(path string) (*net.UnixListener, error) {
 		return nil, err
 	}
 	defer lock.Close()
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+	info, err := lock.Stat()
+	if err != nil {
 		return nil, err
+	}
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !info.Mode().IsRegular() || !ok || int(st.Uid) != os.Getuid() {
+		return nil, fmt.Errorf("%s.lock is not a regular file of the current user", path)
+	}
+	if err := lock.Chmod(0o600); err != nil {
+		return nil, err
+	}
+	deadline := time.Now().Add(LockWait)
+	for {
+		err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, err
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("%s.lock: another process holds the start lock", path)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 	return listenLocked(path)
 }

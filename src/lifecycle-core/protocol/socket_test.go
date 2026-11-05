@@ -266,30 +266,40 @@ func TestConcurrentListenAtStaleSocket(t *testing.T) {
 	stale.SetUnlinkOnClose(false)
 	stale.Close()
 	const n = 8
-	results := make(chan *net.UnixListener, n)
+	type result struct {
+		l   *net.UnixListener
+		err error
+	}
+	results := make(chan result, n)
 	start := make(chan struct{})
 	for i := 0; i < n; i++ {
 		go func() {
 			<-start
 			l, err := Listen(sock)
-			if err != nil {
-				l = nil
-			}
-			results <- l
+			results <- result{l, err}
 		}()
 	}
 	close(start)
 	var live []*net.UnixListener
+	var errs []error
 	for i := 0; i < n; i++ {
-		if l := <-results; l != nil {
-			live = append(live, l)
+		if r := <-results; r.err == nil {
+			live = append(live, r.l)
+		} else {
+			errs = append(errs, r.err)
 		}
 	}
 	for _, l := range live {
 		defer l.Close()
 	}
 	if len(live) != 1 {
-		t.Fatalf("%d listeners bound the path, want 1", len(live))
+		t.Fatalf("%d listeners bound the path, want 1; errors: %v", len(live), errs)
+	}
+	// Each other start sees the live socket of the first one.
+	for _, err := range errs {
+		if !strings.Contains(err.Error(), "has a listener") {
+			t.Fatalf("a start failed for another reason: %v", err)
+		}
 	}
 	conn, err := net.Dial("unix", sock)
 	if err != nil {
@@ -298,5 +308,33 @@ func TestConcurrentListenAtStaleSocket(t *testing.T) {
 	conn.Close()
 	if info, err := os.Lstat(sock + ".lock"); err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("lock file: %v %v", info, err)
+	}
+}
+
+// Listen refuses a lock path that is not a regular file.
+func TestListenRefusesLockThatIsNotFile(t *testing.T) {
+	inTempDir(t)
+	if err := os.Mkdir(sock+".lock", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Listen(sock); err == nil {
+		t.Fatal("Listen used a directory as the lock file")
+	}
+}
+
+// Listen sets mode 0600 on a lock file that has another mode.
+func TestListenSetsLockMode(t *testing.T) {
+	inTempDir(t)
+	if err := os.WriteFile(sock+".lock", nil, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	os.Chmod(sock+".lock", 0o666)
+	l, err := Listen(sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	if info, _ := os.Stat(sock + ".lock"); info.Mode().Perm() != 0o600 {
+		t.Fatalf("lock mode %v, want 0600", info.Mode().Perm())
 	}
 }
