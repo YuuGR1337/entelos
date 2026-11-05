@@ -61,6 +61,11 @@ func Implementation() (string, error) {
 	sort.Strings(names)
 	var body []byte
 	for _, name := range names {
+		// The identity holds only the core sources. The Python identity
+		// also leaves out its tests.
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
 		raw, err := sources.ReadFile(name)
 		if err != nil {
 			return "", err

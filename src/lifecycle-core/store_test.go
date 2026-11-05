@@ -253,3 +253,29 @@ func TestGitStoreRefusesANonBareRepository(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+// A caller that changes the bytes of a read does not change the store.
+func TestReadBytesAreACopy(t *testing.T) {
+	eachStore(t, func(t *testing.T, s Store) {
+		write(t, s, "", "a", "1")
+		view := root(t, s)
+		ref := view.State["heads"].(Object)["a"]
+		raw, err := view.GetRaw(ref, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range raw {
+			raw[i] = 'X'
+		}
+		if got, err := root(t, s).Get(ref, "source"); err != nil || got["value"] != "1" {
+			t.Fatalf("a changed read buffer changed the store: %v %v", got, err)
+		}
+		pending := root(t, s)
+		staged := pending.PutRaw("text/plain", []byte("abc"))
+		first, _ := pending.GetRaw(staged, "text/plain")
+		first[0] = 'X'
+		if again, err := pending.GetRaw(staged, "text/plain"); err != nil || string(again) != "abc" {
+			t.Fatalf("a changed read buffer changed staged content: %q %v", again, err)
+		}
+	})
+}

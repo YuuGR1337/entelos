@@ -5,6 +5,7 @@ package lifecycle
 // published only if the captured root is still current. It is not durable.
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"sort"
@@ -39,7 +40,8 @@ func (s *MemoryStore) object(handle string) ([]byte, error) {
 	if !ok {
 		return nil, NewFault("store_error", "missing object "+handle, "store")
 	}
-	return body, nil
+	// Give a copy, so that a caller cannot change committed content.
+	return bytes.Clone(body), nil
 }
 
 func (s *MemoryStore) History(cursor string) ([]string, error) {

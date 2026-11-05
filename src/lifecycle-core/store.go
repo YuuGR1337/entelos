@@ -63,7 +63,9 @@ func (v *View) GetRaw(ref any, mime string) ([]byte, error) {
 		return nil, NewFault("invalid_reference", "expected an exact content reference", "store")
 	}
 	body, ok := v.pending[s]
-	if !ok {
+	if ok {
+		body = bytes.Clone(body)
+	} else {
 		handle, found := v.Entries["o-"+s[7:]]
 		if !found {
 			return nil, NewFault("artifact_unavailable", s, "store")

@@ -30,10 +30,13 @@ The `go-lifecycle-core` check in `verify.py` does these steps:
 
 The parity check aliases each content reference and each cursor by its first appearance. Then it compares the two traces and the scenario checks. The snapshot references must also be byte-identical.
 
+## Build identity
+
+The lifecycle build identity is a content reference over the core `*.go` sources, the Go version and the `git --version` text. It does not include the `*_test.go` files. The Python identity also includes only its core sources.
+
 ## Limits
 
 - Records that hold the lifecycle build (reports, receipts and decisions) have different content references, because the two builds are different.
 - A fault code is the same as in Python. A message that comes from a Python exception text can be different.
 - The scenario parity runs only on the Git adapter. The in-memory adapter has the storage vectors, store tests and one in-process Host test.
-- The build identity includes the test sources of the package.
 - Windows is not tested.

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -54,17 +55,53 @@ func (r *CELRuntime) call(args []string, data []byte) (int, any, error) {
 		cmd.Stdin = bytes.NewReader(data)
 	}
 	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
+	stderr := &boundedBuffer{limit: maxStderr}
+	cmd.Stdout, cmd.Stderr = &stdout, stderr
 	err := cmd.Run()
+	unavailable := func(message string) error {
+		if text := strings.TrimSpace(stderr.String()); text != "" {
+			message += "; stderr: " + text
+		}
+		return NewFault("implementation_unavailable", "pinned CEL process unavailable: "+message, "runtime")
+	}
 	var exit *exec.ExitError
 	if err != nil && (!errors.As(err, &exit) || ctx.Err() != nil) {
-		return 0, nil, NewFault("implementation_unavailable", "pinned CEL process unavailable: "+err.Error(), "runtime")
+		return 0, nil, unavailable(err.Error())
 	}
 	value, derr := Decode(stdout.Bytes())
 	if derr != nil {
-		return 0, nil, NewFault("implementation_unavailable", "pinned CEL process unavailable: "+derr.(*Fault).Message, "runtime")
+		return 0, nil, unavailable(derr.(*Fault).Message)
 	}
 	return cmd.ProcessState.ExitCode(), value, nil
+}
+
+// maxStderr is the number of stderr bytes that a fault message can hold.
+const maxStderr = 4096
+
+// boundedBuffer keeps the first limit bytes and discards the rest. It does
+// not embed bytes.Buffer, so that io.Copy cannot use ReadFrom past the limit.
+type boundedBuffer struct {
+	data      []byte
+	limit     int
+	truncated bool
+}
+
+func (b *boundedBuffer) Write(p []byte) (int, error) {
+	n := len(p)
+	room := b.limit - len(b.data)
+	if room < n {
+		b.truncated = true
+		p = p[:max(room, 0)]
+	}
+	b.data = append(b.data, p...)
+	return n, nil
+}
+
+func (b *boundedBuffer) String() string {
+	if b.truncated {
+		return string(b.data) + " [truncated]"
+	}
+	return string(b.data)
 }
 
 func (r *CELRuntime) Build() (string, error) {
@@ -112,6 +149,10 @@ func (r *CELRuntime) Execute(files map[string][]byte, command string, inputs []b
 	if err != nil {
 		return nil, err
 	}
+	// Only describe treats a nonzero exit as a fault, as in cel_runtime.py.
+	// check exits 1 with a JSON report when a case fails; the Host records
+	// that report as a failed qualification. run gives a JSON response that
+	// the Host checks for the expected bundle and build.
 	if command == "describe" && code != 0 {
 		status, ok := lookupAny(value, "status").(string)
 		if !ok {

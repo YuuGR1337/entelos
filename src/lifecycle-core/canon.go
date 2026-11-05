@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -314,11 +315,23 @@ func (p *parser) number() (any, error) {
 		}
 		return Int{text}, nil
 	}
+	return parseFloat(text)
+}
+
+// parseFloat converts float text like the Python float(). An underflow gives
+// zero or a subnormal value, as in Python. An overflow and any other error
+// give a codec fault.
+func parseFloat(text string) (any, error) {
 	f, err := strconv.ParseFloat(text, 64)
-	if err != nil && (math.IsInf(f, 0) || math.IsNaN(f)) {
+	switch {
+	case err == nil:
+		return f, nil
+	case errors.Is(err, strconv.ErrRange) && !math.IsInf(f, 0):
+		return f, nil
+	case errors.Is(err, strconv.ErrRange):
 		return nil, codecFault("Out of range float values are not JSON compliant")
 	}
-	return f, nil
+	return nil, codecFault("invalid float text")
 }
 
 // Encode gives the canonical record bytes with a final newline.
