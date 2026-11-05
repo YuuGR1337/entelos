@@ -28,13 +28,18 @@ async function session(executor, s) {
   // Two invokes at the same time must take two cursors.
   const concurrent = await Promise.all(s.concurrent.map((step) =>
     attempt(() => executor.invoke(log, step.date, step.inputs)).then((r) => ({ name: step.name, ...r }))));
+  // A load while an invocation is pending must fail, and the pending
+  // invocation must answer under the pin that was loaded when it was made.
+  const pending = attempt(() => executor.invoke(log, s.pending.date, s.pending.inputs)).then((r) => ({ name: s.pending.name, ...r }));
+  const pendingLoad = await attempt(() => executor.load(s.pin, files));
+  const pendingInvoke = await pending;
   const before = await log.entries();
   log.close();
   log = await ReceiptLog.open(s.log_name);
   const after = await log.entries();
   const exported = await log.entries({ includeInputs: s.include_inputs });
   log.close();
-  return { loaded, invokes, concurrent, reopened_equal: JSON.stringify(before) === JSON.stringify(after), entries: exported };
+  return { loaded, invokes, concurrent, pending_load: pendingLoad, pending: pendingInvoke, reopened_equal: JSON.stringify(before) === JSON.stringify(after), entries: exported };
 }
 
 try {
@@ -47,8 +52,15 @@ try {
   tampered[tampered.length - 1] ^= 1;
   out.tampered = await attempt(() => loadModule({ moduleBytes: tampered, expectedModuleRef: job.module_ref, wasmExecUrl: "./wasm_exec.js" }));
   const t2 = performance.now();
-  const executor = await loadModule({ moduleBytes: bytes, expectedModuleRef: job.module_ref, wasmExecUrl: "./wasm_exec.js" });
+  // The caller changes its buffer after the call. The module must still start,
+  // because loadModule checks and runs its own copy. The changed byte is in
+  // the WebAssembly magic number, so a run of the changed bytes cannot start.
+  const callerBytes = bytes.slice();
+  const started = loadModule({ moduleBytes: callerBytes.buffer, expectedModuleRef: job.module_ref, wasmExecUrl: "./wasm_exec.js" });
+  callerBytes[0] ^= 1;
+  const executor = await started;
   const t3 = performance.now();
+  out.changed_after_call = { started: true };
   out.timing = { fetch_ms: Math.round(t1 - t0), start_ms: Math.round(t3 - t2) };
   out.user_agent = navigator.userAgent;
   out.module_ref = executor.moduleRef;

@@ -216,9 +216,9 @@ The vectors in [conformance/executor/](../src/cel-lifecycle/conformance/executor
 
 `web/entelos-executor.mjs` is the browser module for an application:
 
-- `loadModule({moduleBytes, expectedModuleRef, wasmExecUrl})` starts the module only if `contentRef("application/wasm", bytes)` is `expectedModuleRef`. Else it fails closed with `artifact_mismatch` at the `module` stage. A page runs one module.
+- `loadModule({moduleBytes, expectedModuleRef, wasmExecUrl})` starts the module only if `contentRef("application/wasm", bytes)` is `expectedModuleRef`. Else it fails closed with `artifact_mismatch` at the `module` stage. It copies the bytes first, then checks and runs that copy, so a later change to the caller's buffer has no effect. A page runs one module.
 - `ReceiptLog.open(name)` opens an IndexedDB database with the stores `entries` and `inputs`. The cursor is the key, from 1.
-- `executor.invoke(log, date, inputs)` takes the next cursor, runs the executor and stores the entry and the raw inputs in one readwrite transaction. A refusal throws an `ExecutorError` with the diagnostic and stores nothing. Two invokes at the same time get two cursors in order.
+- `executor.invoke(log, date, inputs)` takes the next cursor, runs the executor and stores the entry and the raw inputs in one readwrite transaction. A refusal throws an `ExecutorError` with the diagnostic and stores nothing. Two invokes at the same time get two cursors in order. The bridge evaluates an invocation when its transaction runs. Thus `executor.load` refuses with `invalid_request` at the `load` stage while an invocation is pending, so a new pin never answers an earlier invocation.
 - `log.entries({from, includeInputs})` gives the entries in cursor order for `ingest`. The raw inputs are in the export only if `includeInputs` is true.
 
 [examples/browser-executor](../examples/browser-executor/) runs the complete path: WASM qualification on the Host, a pin from the Host records, answers and a log in the browser, and an ingest of that log.

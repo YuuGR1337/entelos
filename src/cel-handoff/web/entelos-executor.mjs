@@ -34,9 +34,10 @@ function result(raw) {
 // have the content reference expectedModuleRef (media application/wasm), so
 // a changed module fails closed before it runs. wasmExecUrl names the Go
 // support script wasm_exec.js of the same Go release that built the module.
-// A page can run one module.
+// A page can run one module. The function copies the bytes first and checks
+// and runs that copy, so a later change to the caller's buffer has no effect.
 export async function loadModule({ moduleBytes, expectedModuleRef, wasmExecUrl }) {
-  const bytes = new Uint8Array(moduleBytes);
+  const bytes = new Uint8Array(moduleBytes).slice();
   const ref = await contentRef("application/wasm", bytes);
   if (ref !== expectedModuleRef) {
     throw new ExecutorError({ code: "artifact_mismatch", stage: "module", field: "/module", message: `module ${ref} is not ${expectedModuleRef}` });
@@ -58,21 +59,31 @@ export class Executor {
   constructor(api, moduleRef) {
     this.api = api;
     this.moduleRef = moduleRef;
+    this.pending = 0;
   }
 
   // build gives the implementation_ref of the module.
   build() { return result(this.api.build()); }
 
   // load checks the pin against the bundle files (Uint8Array values) and
-  // gives the callable descriptor.
-  load(pin, files) { return result(this.api.load(JSON.stringify(pin), files)); }
+  // gives the callable descriptor. The bridge evaluates an invocation when its
+  // log transaction runs. Thus load refuses while an invocation is pending, so
+  // a new pin never answers an invocation that the caller made under the old pin.
+  load(pin, files) {
+    if (this.pending > 0) {
+      throw new ExecutorError({ code: "invalid_request", stage: "load", message: `${this.pending} invocations are pending; load after they complete` });
+    }
+    return result(this.api.load(JSON.stringify(pin), files));
+  }
 
   // invoke evaluates inputs at date and appends the entry to the log at the
   // next cursor, in one IndexedDB transaction. A refusal throws an
   // ExecutorError and writes nothing.
   invoke(log, date, inputs) {
     const inputsJSON = JSON.stringify(inputs);
-    return log.append((cursor) => JSON.parse(this.api.invoke(cursor, date, inputsJSON)), inputsJSON);
+    this.pending++;
+    return log.append((cursor) => JSON.parse(this.api.invoke(cursor, date, inputsJSON)), inputsJSON)
+      .finally(() => { this.pending--; });
   }
 }
 

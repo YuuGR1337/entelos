@@ -22,15 +22,16 @@ Use a new path outside this checkout for `--work`. The directory must not exist.
 1. It starts four sidecars on one Git store: `author`, `runner`, `reviewer` and `browser`. The `browser` context has the worker `browser-1`. The engine of each sidecar is the WebAssembly module under Node. Thus qualification binds the module build.
 2. It runs the sidecar-client loop: propose, qualify, decide and activate.
 3. It reads the activation event and the snapshot, and makes the pin from these records.
-4. It serves a local page on 127.0.0.1 and starts the browser with a new profile. The page loads the module only if its content reference is the expected one. A module with one changed byte must fail with `artifact_mismatch`.
+4. It serves a local page on 127.0.0.1 and starts the browser with a new profile. The page loads the module only if its content reference is the expected one. A module with one changed byte must fail with `artifact_mismatch`. A change to the caller's buffer after the call must have no effect.
 5. The page runs the executor vectors, loads the pin and invokes the function:
    - two answers, compared with the fixture and the source table;
    - a date before `from`, which must give `out_of_scope`;
    - the date `until`, which must give `activation_expired`, because the pin is `fail_closed`;
-   - two invokes at the same time, which must get cursors 3 and 4.
+   - two invokes at the same time, which must get cursors 3 and 4;
+   - a `load` while one more invocation is pending, which must fail with `invalid_request`. The pending invocation gets cursor 5.
 6. The page closes the log, opens it again and compares the entries. The export has no raw inputs.
 7. The example computes each `inputs_ref` with its own codec and compares it with the entries.
-8. It sends the entries to `ingest` on the `browser` socket two times. The first ingest adds 4 receipts. The second ingest adds 0 and gives the same receipts. Each receipt must name `browser-1`, its cursor, the snapshot and the engine build of the pin.
+8. It sends the entries to `ingest` on the `browser` socket two times. The first ingest adds 5 receipts. The second ingest adds 0 and gives the same receipts. Each receipt must name `browser-1`, its cursor, the snapshot and the engine build of the pin.
 9. It stops each sidecar with SIGTERM.
 
 The example writes `results.json` to the work directory. The file has each check, the browser record, the page result and the timing.

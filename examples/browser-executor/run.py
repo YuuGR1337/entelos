@@ -52,15 +52,16 @@ def session(run, clients, fixture, record_bundle, summary):
                     {'name': 'before-from', 'date': '2000-01-01', 'inputs': visible},
                     {'name': 'at-until', 'date': pin['until'], 'inputs': visible}],
         'concurrent': [{'name': 'concurrent-a', 'date': '2026-10-17', 'inputs': visible},
-                       {'name': 'concurrent-b', 'date': '2026-10-17', 'inputs': closed}]}
+                       {'name': 'concurrent-b', 'date': '2026-10-17', 'inputs': closed}],
+        'pending': {'name': 'pending', 'date': '2026-10-18', 'inputs': visible}}
 
 
 def judge(run, page, pin, fixture, job):
     """Check the browser observations against the stated expectations."""
     s = page['session']
     run.check('browser-pin-loads', s['loaded'].get('ok', {}).get('bundle_ref') == pin['bundle_ref'], s['loaded'])
-    by_name = {x['name']: x for x in s['invokes'] + s['concurrent']}
-    expected = {'visible': fixture['expected']['initial_october_ready'], 'other-state': False, 'concurrent-a': True, 'concurrent-b': False}
+    by_name = {x['name']: x for x in s['invokes'] + s['concurrent'] + [s['pending']]}
+    expected = {'visible': fixture['expected']['initial_october_ready'], 'other-state': False, 'concurrent-a': True, 'concurrent-b': False, 'pending': True}
     for name, value in expected.items():
         entry = by_name[name].get('ok', {})
         run.check('browser-answer-' + name, entry.get('response', {}).get('value') is value and entry.get('stale_reason') == ''
@@ -69,11 +70,14 @@ def judge(run, page, pin, fixture, job):
     # The pin is fail_closed, so these dates give a refusal and no log entry.
     run.check('browser-refuses-before-from', by_name['before-from'].get('diagnostic', {}).get('code') == 'out_of_scope', by_name['before-from'])
     run.check('browser-refuses-at-until', by_name['at-until'].get('diagnostic', {}).get('code') == 'activation_expired', by_name['at-until'])
+    # A load during the pending invocation fails, and that invocation keeps the old pin.
+    run.check('browser-load-waits-for-pending', s['pending_load'].get('diagnostic', {}).get('code') == 'invalid_request'
+              and s['pending_load']['diagnostic'].get('stage') == 'load', s['pending_load'])
     cursors = [e['cursor'] for e in s['entries']]
-    run.check('browser-log-cursors', cursors == [1, 2, 3, 4] and {by_name['concurrent-a']['ok']['cursor'], by_name['concurrent-b']['ok']['cursor']} == {3, 4},
+    run.check('browser-log-cursors', cursors == [1, 2, 3, 4, 5] and {by_name['concurrent-a']['ok']['cursor'], by_name['concurrent-b']['ok']['cursor']} == {3, 4},
               cursors)
     run.check('browser-log-persists', s['reopened_equal'], s['reopened_equal'])
-    steps = {x['name']: x for x in job['invokes'] + job['concurrent']}
+    steps = {x['name']: x for x in job['invokes'] + job['concurrent'] + [job['pending']]}
     run.check('browser-inputs-stay', all('inputs' not in e for e in s['entries']), [sorted(e) for e in s['entries']])
     run.check('browser-input-digests', all(by_name[n]['ok']['inputs_ref'] == input_ref(steps[n]['inputs']) for n in expected), list(expected))
     return s['entries']
@@ -84,7 +88,7 @@ def ingest(run, clients, entries, pin):
     client = clients['browser']
     first = run.send(client, 'ingest', 'ingest', {'entries': entries})
     again = run.send(client, 'ingest-again', 'ingest', {'entries': entries})
-    run.check('ingest-adds-each-entry', first['added'] == 4 and first['log_cursor'] == 4 and first['executor_id'] == EXECUTOR, first)
+    run.check('ingest-adds-each-entry', first['added'] == 5 and first['log_cursor'] == 5 and first['executor_id'] == EXECUTOR, first)
     run.check('ingest-is-idempotent', again['added'] == 0 and again['receipts'] == first['receipts'], again)
     receipts = [run.send(client, 'receipt-%d' % i, 'receipt', {'receipt_ref': ref}, write=False) for i, ref in enumerate(first['receipts'], 1)]
     run.check('ingested-receipts', all(r['executor_id'] == EXECUTOR and r['log_cursor'] == i and r['mode'] == 'ingest' and r['stale'] is False

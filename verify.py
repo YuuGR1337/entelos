@@ -173,7 +173,7 @@ try:
  _,browser_steps=executor_results('browser-page.json') if page.get('vectors') else (None,None)
  check('browser-executor-vectors','Do the executor vectors pass in a headless browser, with the same entries as the native build except the build and bundle identities?',
        browser_vectors.returncode==0 and browser_result['status']=='passed' and browser_steps==native_steps and page.get('implementation_ref')==wasm_build.get('implementation_ref')
-       and page.get('tampered',{}).get('diagnostic',{}).get('code')=='artifact_mismatch',
+       and page.get('tampered',{}).get('diagnostic',{}).get('code')=='artifact_mismatch' and page.get('changed_after_call',{}).get('started') is True,
        {'status':browser_result['status'],'errors':browser_result.get('errors'),'browser':browser_result.get('browser'),'timing':page.get('timing'),
         'user_agent':page.get('user_agent'),'tampered':page.get('tampered'),'steps':len(browser_steps or [])})
  example=run('browser-executor-example',[sys.executable,'-B',ROOT/'examples/browser-executor/run.py','--work',w/'browser-executor','--sidecar',w/'bin/entelos-sidecar',
