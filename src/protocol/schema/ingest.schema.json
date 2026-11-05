@@ -1,0 +1,117 @@
+{
+ "$defs": {
+  "request_body": {
+   "additionalProperties": false,
+   "properties": {
+    "entries": {
+     "items": {
+      "additionalProperties": false,
+      "properties": {
+       "cursor": {
+        "type": "integer"
+       },
+       "date": {
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+        "type": "string"
+       },
+       "inputs": {},
+       "inputs_ref": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+       },
+       "response": {
+        "type": "object"
+       },
+       "snapshot_ref": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+       },
+       "stale_reason": {
+        "enum": [
+         "",
+         "expired",
+         "revoked"
+        ]
+       }
+      },
+      "required": [
+       "cursor",
+       "date",
+       "inputs_ref",
+       "response",
+       "snapshot_ref"
+      ],
+      "type": "object"
+     },
+     "minItems": 1,
+     "type": "array"
+    },
+    "expected_revision": {
+     "type": "string"
+    },
+    "request_key": {
+     "maxLength": 128,
+     "minLength": 1,
+     "type": "string"
+    }
+   },
+   "required": [
+    "entries",
+    "expected_revision",
+    "request_key"
+   ],
+   "type": "object"
+  },
+  "result": {
+   "additionalProperties": false,
+   "properties": {
+    "cursor": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "result": {
+     "additionalProperties": false,
+     "properties": {
+      "added": {
+       "type": "integer"
+      },
+      "executor_id": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "log_cursor": {
+       "type": "integer"
+      },
+      "receipts": {
+       "items": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+       },
+       "type": "array"
+      }
+     },
+     "required": [
+      "added",
+      "executor_id",
+      "log_cursor",
+      "receipts"
+     ],
+     "type": "object"
+    },
+    "reused": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "cursor",
+    "result",
+    "reused"
+   ],
+   "type": "object"
+  }
+ },
+ "$id": "https://github.com/mohanraj00/entelos/blob/main/src/protocol/schema/ingest.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "ingest",
+ "x-entelos-access": "write"
+}

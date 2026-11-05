@@ -431,6 +431,130 @@
      }
     }
    }
+  },
+  {
+   "name": "ingest-unknown-snapshot",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-14",
+    "operation": "ingest",
+    "body": {
+     "entries": [
+      {
+       "cursor": 1,
+       "snapshot_ref": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+       "date": "2026-11-15",
+       "inputs_ref": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "response": {
+        "status": "ok",
+        "value": true
+       }
+      }
+     ],
+     "expected_revision": {
+      "$use": "c2"
+     },
+     "request_key": "k-6"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-14",
+     "status": "artifact_unavailable",
+     "diagnostic": {
+      "code": "artifact_unavailable",
+      "stage": "store",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "ingest-raw-inputs-refused",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-15",
+    "operation": "ingest",
+    "body": {
+     "entries": [
+      {
+       "cursor": 1,
+       "snapshot_ref": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+       "date": "2026-11-15",
+       "inputs_ref": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "response": {
+        "status": "ok",
+        "value": true
+       },
+       "inputs": {
+        "state": "approved"
+       }
+      }
+     ],
+     "expected_revision": {
+      "$use": "c2"
+     },
+     "request_key": "k-7"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-15",
+     "status": "upload_not_permitted",
+     "diagnostic": {
+      "code": "upload_not_permitted",
+      "stage": "lifecycle",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "ingest-entry-names-an-executor",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-16",
+    "operation": "ingest",
+    "body": {
+     "entries": [
+      {
+       "cursor": 1,
+       "snapshot_ref": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+       "date": "2026-11-15",
+       "inputs_ref": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "response": {
+        "status": "ok",
+        "value": true
+       },
+       "executor_id": "other-worker"
+      }
+     ],
+     "expected_revision": {
+      "$use": "c2"
+     },
+     "request_key": "k-8"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-16",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
   }
  ]
 }

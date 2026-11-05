@@ -156,6 +156,7 @@ The trace shows these steps. The values come from one run on 2026-10-29.
 12. After the load, the same November input gives `false`.
 13. Replay of the old receipt gives `true` again, with the amendment snapshot. Restatement at the correction cursor gives `false`, with the correction snapshot. A replay with changed inputs gives `input_mismatch`.
 14. The correction declares `stale_mode` `continue_stale`. A call for 2026-12-15 is after its `until` date. The loaded correction gives `false`, and the receipt has `stale` `true` and `stale_reason` `expired`.
+15. A simulated offline executor with the executor ID `offline-executor` ingests one log entry: the correction answer for the original input, with the input digest only. A second ingest of the same log adds no receipt. The same cursor with a changed answer gives `ingest_conflict`. In the Go scenario only, not in the Python driver of the demos.
 
 The fixture `expected` block states the six answers before the run: `true`, `true`, `false`, `true`, `false` and `false`. The scenario checks the observed values against that block.
 

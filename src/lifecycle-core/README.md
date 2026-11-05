@@ -31,7 +31,7 @@ The `go-lifecycle-core` check in `verify.py` does these steps:
 
 The Host tests in `host_test.go` start from a copy of the Git repository that the scenario made. The pins name the records of that scenario. `TestUnknownRecordFormatFailsClosed` plants receipts with an unknown, a missing and a malformed format. The `receipt`, `record` and `replay` operations must each give a structured diagnostic and publish no state. The stale mode tests check that `fail_closed` is the default, that an invalid `stale_mode` is refused, that a caller cannot select the mode, that `continue_stale` gives a stale receipt on revocation, and that a reader finds each stale receipt with `inspect` and `receipt`. `schema_test.go` checks that each schema file in `src/protocol/schema/` agrees with the Host table.
 
-`vectors_test.go` runs each storage port vector in `src/cel-lifecycle/conformance/storage/` on a new Git store and a new in-memory store.
+`vectors_test.go` runs each storage port vector in `src/cel-lifecycle/conformance/storage/` on a new Git store and a new in-memory store. `ingest_test.go` runs each ingest vector in `src/cel-lifecycle/conformance/ingest/` on both adapters. It also checks that the executor ID comes from the host context, that raw inputs are not uploaded by default, that malformed entries are refused, and that an ingested receipt is not replayed.
 
 The `go test` step also runs the `protocol/` tests:
 

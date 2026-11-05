@@ -43,6 +43,7 @@ var schema = map[string]struct {
 	"inspect":    {"reviewer", []string{"cursor"}},
 	"record":     {"reviewer", []string{"ref", "kind", "cursor"}},
 	"receipt":    {"reader", []string{"receipt_ref"}},
+	"ingest":     {"worker", []string{"entries"}},
 }
 
 // Reads are the operations that publish no state.
@@ -128,6 +129,13 @@ func NewHostWithRunner(store Store, rt Runtime, runner Runner, context any) (*Ho
 		}
 		if !valid {
 			return nil, NewFault("configuration_error", "host "+name+" must be a nonempty string list", "")
+		}
+	}
+	// upload_inputs is the policy for raw inputs in an ingest. If it is not
+	// set, the raw inputs stay with the executor.
+	if policy, has := ctx["upload_inputs"]; has {
+		if _, ok := policy.(bool); !ok {
+			return nil, NewFault("configuration_error", "host upload_inputs must be a boolean", "")
 		}
 	}
 	build, err := Implementation()
@@ -547,9 +555,144 @@ func (h *Host) receipt(v *View, selection Object, inputs []byte, key any, mode s
 	if truthy(original) {
 		record["matches_original"] = equal(responseRef, original)
 	}
+	// The Host is the executor of the worker in its context. The receipt
+	// takes the next position in the log of that executor.
+	executor := h.ctx("worker")
+	log := executorLog(v, executor)
+	record["executor_id"], record["log_cursor"] = executor, Int{strconv.Itoa(len(log) + 1)}
 	ref := v.Put("receipt", record)
+	setExecutorLog(v, executor, append(log, ref))
 	v.State["receipts"] = append(stringList(v.State["receipts"]), ref)
 	return Object{"receipt_ref": ref, "receipt": record, "actual": actual}
+}
+
+// InputDigest is the content reference of the canonical bytes of inputs. It
+// is the inputs_ref of a receipt.
+func InputDigest(inputs any) string {
+	return ContentRef(Envelope("application/json", Encode(inputs)))
+}
+
+// executorLog gives the receipt references of an executor, in log order.
+// The receipt at position n, from 1, has log_cursor n. A state without
+// executors has empty logs.
+func executorLog(v *View, executor string) Array {
+	logs, ok := lookup(v.State, "executors", Object{}).(Object)
+	if !ok {
+		fail("invalid_record", "state executors must be an object", "store")
+	}
+	return stringList(lookup(logs, executor, Array{}))
+}
+
+func setExecutorLog(v *View, executor string, log Array) {
+	logs, ok := v.State["executors"].(Object)
+	if !ok {
+		logs = Object{}
+		v.State["executors"] = logs
+	}
+	logs[executor] = log
+}
+
+// entryFields are the fields of one entry in the local log of an executor.
+// An entry has no executor_id. The Host takes the executor ID from its
+// context, so an entry cannot name another executor.
+var entryFields = map[string]bool{"cursor": true, "snapshot_ref": true, "date": true, "inputs_ref": true, "response": true,
+	"inputs": true, "stale_reason": true}
+
+// logCursor reads the cursor of a log entry: an integer from 1 to 2^53-1.
+func logCursor(value any) int {
+	n, ok := value.(Int)
+	c, err := strconv.Atoi(n.Text)
+	if !ok || err != nil || c < 1 || c > 1<<53-1 {
+		fail("invalid_request", "log entry cursor must be an integer from 1", "")
+	}
+	return c
+}
+
+// ingest records the entries of the local log of the executor in the Host
+// context. The entries are in log order. Ingest is idempotent on the pair
+// (executor ID, cursor):
+//
+//   - A cursor in the log with the same receipt is a duplicate. It adds
+//     no record.
+//   - A cursor in the log with a different receipt is ingest_conflict.
+//   - The next cursor after the log appends the receipt.
+//   - A cursor after the next cursor is ingest_gap.
+//
+// A fault stops the full ingest, so a failed ingest publishes no state.
+// The Host does not run the rule again. An ingested receipt is the
+// statement of the executor, bound to the pinned snapshot.
+func (h *Host) ingest(v *View, entries any) Object {
+	list, ok := entries.(Array)
+	if !ok || len(list) == 0 {
+		fail("invalid_request", "ingest needs a nonempty list of log entries", "")
+	}
+	executor := h.ctx("worker")
+	upload, _ := h.Context["upload_inputs"].(bool)
+	log := executorLog(v, executor)
+	refs := Array{}
+	added := 0
+	for _, raw := range list {
+		entry, ok := raw.(Object)
+		if !ok {
+			fail("invalid_request", "each log entry must be an object", "")
+		}
+		var extra []string
+		for k := range entry {
+			if !entryFields[k] {
+				extra = append(extra, k)
+			}
+		}
+		if len(extra) > 0 {
+			sort.Strings(extra)
+			fail("invalid_request", "unexpected log entry fields: "+strings.Join(extra, ","), "")
+		}
+		cursor := logCursor(item(entry, "cursor"))
+		inputsRef, isRef := item(entry, "inputs_ref").(string)
+		response, isObject := item(entry, "response").(Object)
+		staleReason := lookup(entry, "stale_reason", "")
+		if !isRef || !refPattern.MatchString(inputsRef) || !isObject || !within(staleReason, Array{"", "expired", "revoked"}) {
+			fail("invalid_request", "log entry needs an inputs_ref, a response object and a known stale_reason", "")
+		}
+		inputs, hasInputs := entry["inputs"]
+		if hasInputs && !upload {
+			fail("upload_not_permitted", "the host policy keeps raw inputs with the executor; send inputs_ref only", "")
+		}
+		if hasInputs && InputDigest(inputs) != inputsRef {
+			fail("input_mismatch", "uploaded inputs differ from inputs_ref", "")
+		}
+		date := checkDate(item(entry, "date"))
+		snapshot := h.scoped(v, item(entry, "snapshot_ref"), "snapshot")
+		if !equal(lookup(response, "bundle_ref", nil), item(snapshot, "bundle_ref")) {
+			fail("artifact_mismatch", "the response names a bundle that differs from the pinned snapshot", "")
+		}
+		responseBytes := Encode(response)
+		selection := Object{"function": item(snapshot, "function"), "scope": item(snapshot, "scope"), "date": date,
+			"snapshot_ref": entry["snapshot_ref"], "bundle_ref": item(snapshot, "bundle_ref"), "engine_build": item(snapshot, "engine_build")}
+		record := Object{"format": RecordFormat, "function": selection["function"], "scope": selection["scope"], "mode": "ingest",
+			"selection": selection, "inputs_ref": inputsRef, "response_ref": ContentRef(Envelope("application/json", responseBytes)),
+			"executor_id": executor, "log_cursor": Int{strconv.Itoa(cursor)}, "stale_mode": lookup(snapshot, "stale_mode", failClosed),
+			"stale": staleReason != "", "stale_reason": staleReason}
+		ref := ContentRef(Envelope(Media("receipt"), Encode(record)))
+		switch {
+		case cursor <= len(log):
+			if !equal(log[cursor-1], ref) {
+				fail("ingest_conflict", "executor "+executor+" has a different receipt at cursor "+strconv.Itoa(cursor), "")
+			}
+		case cursor == len(log)+1:
+			if hasInputs {
+				v.PutRaw("application/json", Encode(inputs))
+			}
+			v.PutRaw("application/json", responseBytes)
+			v.Put("receipt", record)
+			log = append(log, ref)
+			added++
+		default:
+			fail("ingest_gap", "cursor "+strconv.Itoa(cursor)+" does not follow cursor "+strconv.Itoa(len(log))+" of executor "+executor, "")
+		}
+		refs = append(refs, ref)
+	}
+	setExecutorLog(v, executor, log)
+	return Object{"executor_id": executor, "log_cursor": Int{strconv.Itoa(len(log))}, "added": Int{strconv.Itoa(added)}, "receipts": refs}
 }
 
 func (h *Host) appendEvent(v *View, event Object, key any) Object {
@@ -923,6 +1066,8 @@ func (h *Host) apply(v *View, op string, q Object) any {
 		}
 		record["status"], record["worker"] = "acknowledged", h.ctx("worker")
 		return copyObject(record)
+	case "ingest":
+		return h.ingest(v, item(q, "entries"))
 	}
 	fail("invalid_request", "unimplemented operation", "")
 	return nil

@@ -42,14 +42,19 @@ func newScenarioDriver(work, binary string, fixture Object) (*scenarioDriver, er
 	d := &scenarioDriver{work: work, repo: filepath.Join(work, "state.git"), binary: binary, fixture: fixture, contexts: map[string]Object{}}
 	roles := map[string]Array{"reviewer": {"reviewer", "reader"}, "author": {"author"}, "runner": {"runner"}, "caller": {"caller"},
 		"worker": {"worker"}, "reader": {"reader"}, "observer": {"observer"}, "maintainer": {"maintainer"},
-		"other-runner": {"runner"}, "other-maintainer": {"maintainer"}}
+		"other-runner": {"runner"}, "other-maintainer": {"maintainer"}, "executor": {"worker"}}
 	for name, permissions := range roles {
-		actor := name
+		actor, worker := name, "local-worker"
 		if name == "runner" {
 			actor = "fixture-runner"
 		}
+		// The executor context is a simulated offline executor with its own
+		// executor ID.
+		if name == "executor" {
+			worker = "offline-executor"
+		}
 		context := Object{"actor": actor, "roles": permissions, "scope": fixture["scope"], "runner_actor": "fixture-runner",
-			"worker": "local-worker", "functions": Array{fixture["function"]}}
+			"worker": worker, "functions": Array{fixture["function"]}}
 		raw := Encode(context)
 		if err := os.WriteFile(filepath.Join(work, name+".json"), raw, 0o666); err != nil {
 			return nil, err
@@ -375,6 +380,29 @@ func (d *scenarioDriver) demonstrate(bundleDir string) (pins Object, err error) 
 			at(after, "receipt", "stale") == false && at(after, "receipt", "stale_mode") == "continue_stale" &&
 			at(before, "receipt", "stale") == false && at(before, "receipt", "stale_mode") == "fail_closed",
 		Object{"stale": staleRead, "live_correction": after["receipt"], "live_amendment": before["receipt"]})
+	// A simulated offline executor ran the correction on the original input
+	// and wrote one entry to its local log. The entry has only the input
+	// digest. A second ingest of the same log adds no records. A changed
+	// answer at the same cursor is a conflict.
+	answer := after["actual"].(Object)
+	entry := Object{"cursor": Int{"1"}, "snapshot_ref": snap3, "date": "2026-11-15", "inputs_ref": InputDigest(original), "response": answer}
+	first := result(d.call("executor", "ingest", "executor-ingest", "ok", Object{"entries": Array{entry}}))
+	again := result(d.call("executor", "ingest", "executor-ingest-again", "ok", Object{"entries": Array{entry}}))
+	changed := merge(entry, Object{"response": merge(answer, Object{"value": answer["value"] != true})})
+	d.call("executor", "ingest", "executor-ingest-changed", "ingest_conflict", Object{"entries": Array{changed}})
+	ingestedRef := at(first, "receipts").(Array)[0]
+	ingested := d.call("reader", "receipt", "", "ok", Object{"receipt_ref": ingestedRef})
+	logs := at(d.call("reviewer", "inspect", "", "ok", Object{}), "state", "executors").(Object)
+	position := at(after, "receipt", "log_cursor").(Int)
+	n, _ := strconv.Atoi(position.Text)
+	local := logs["local-worker"].(Array)
+	d.check("receipt-provenance-ingest", "Can an operator trace each receipt to its executor, its log cursor and its exact inputs, and does a repeated ingest add no records?",
+		at(after, "receipt", "executor_id") == "local-worker" && n >= 1 && n <= len(local) && local[n-1] == after["receipt_ref"] &&
+			at(after, "receipt", "inputs_ref") == InputDigest(original) && first["added"] == Int{"1"} && again["added"] == Int{"0"} &&
+			equal(first["receipts"], again["receipts"]) && equal(logs["offline-executor"], Array{ingestedRef}) &&
+			ingested["executor_id"] == "offline-executor" && ingested["log_cursor"] == Int{"1"} && ingested["mode"] == "ingest" &&
+			ingested["inputs_ref"] == at(after, "receipt", "inputs_ref") && at(ingested, "selection", "snapshot_ref") == snap3,
+		Object{"first": first, "again": again, "ingested": ingested, "executors": logs})
 	complete := result(d.call("other-maintainer", "checkpoint", "complete-correction", "ok", Object{"task_id": observation["task_id"], "checkpoint": taken["checkpoint"],
 		"token": taken["token"], "status": "complete", "note": "Source correction activated; original answer replayed and correction restated.", "correction_snapshot": snap3}))
 	d.check("restart-and-fenced-task", "Can a fresh process resume a saved task while rejecting the old owner?",
@@ -485,12 +513,12 @@ func requireScenario(t *testing.T) scenarioRun {
 	return run
 }
 
-// The scenario has 72 steps and 11 checks. Each check passed, or the
+// The scenario has 77 steps and 12 checks. Each check passed, or the
 // scenario stopped with an error.
 func TestLifecycleScenario(t *testing.T) {
 	run := requireScenario(t)
-	if len(run.driver.trace) != 72 || len(run.driver.checks) != 11 {
-		t.Fatalf("%d steps and %d checks, want 72 and 11", len(run.driver.trace), len(run.driver.checks))
+	if len(run.driver.trace) != 77 || len(run.driver.checks) != 12 {
+		t.Fatalf("%d steps and %d checks, want 77 and 12", len(run.driver.trace), len(run.driver.checks))
 	}
 	for _, x := range run.driver.trace {
 		step := x.(Object)

@@ -617,3 +617,14 @@ func TestStaleReceiptsCanBeFound(t *testing.T) {
 		t.Fatalf("restated receipt %v", restated)
 	}
 }
+
+// The Host and an ingest share one log for each executor ID. An ingest
+// under the ID of the Host worker cannot replace a receipt that the Host
+// wrote at a cursor.
+func TestIngestCannotReplaceAHostReceipt(t *testing.T) {
+	f := newFixture(t)
+	snapshot := f.ok(f.host("reviewer", nil).Handle(Object{"op": "record", "ref": f.pin("correction_snapshot"), "kind": "snapshot"}))
+	entry := Object{"cursor": Int{"1"}, "snapshot_ref": f.pin("correction_snapshot"), "date": "2026-11-15",
+		"inputs_ref": InputDigest(Object{"state": "approved"}), "response": Object{"bundle_ref": snapshot["bundle_ref"]}}
+	f.expect("ingest_conflict")(f.host("worker", nil).Handle(f.request("ingest", Object{"entries": Array{entry}})))
+}

@@ -95,7 +95,7 @@ A failure:
 | `host` | The Host failed with an unexpected error (`internal_error`). The message has no exception text and no paths. |
 | `lifecycle`, `admission`, `resolve`, `runtime`, `store`, `codec` | The Host and the store. The codes are the existing `Fault` codes of the lifecycle core in `src/lifecycle-core`. |
 
-The protocol adds four codes: `unsupported_version`, `invalid_frame`, `response_too_large` and `internal_error`. The receiver also sends `internal_error` if a Host result is outside the value domain, for example a float or an object key that is not a string. All other codes are the existing `Fault` codes, for example `invalid_request`, `forbidden`, `out_of_scope`, `invalid_interval`, `stale_revision`, `idempotency_conflict`, `artifact_unavailable`, `activation_expired` and `activation_revoked`.
+The protocol adds four codes: `unsupported_version`, `invalid_frame`, `response_too_large` and `internal_error`. The receiver also sends `internal_error` if a Host result is outside the value domain, for example a float or an object key that is not a string. All other codes are the existing `Fault` codes, for example `invalid_request`, `forbidden`, `out_of_scope`, `invalid_interval`, `stale_revision`, `idempotency_conflict`, `artifact_unavailable`, `activation_expired`, `activation_revoked`, `ingest_conflict`, `ingest_gap` and `upload_not_permitted`.
 
 `message` is text for a person. A program must use `code` and `stage`. The vectors do not compare `message`.
 
@@ -134,5 +134,5 @@ The Go sidecar (#84) passes the vector files:
 ## Limits
 
 - The vectors do not run a rule. `describe` with an activation, `qualify`, `load`, `invoke`, `replay` and `restate` are checked only by their schemas. The [sidecar client](../../examples/sidecar-client/README.md) runs `qualify`, `describe`, `load` and `invoke` through the socket with the pinned runtime, but it is an example, not a vector.
-- A record object inside a result (`record`, `receipt`, `report`) must have `format: "entelos.record/1"`. A receipt in the `invoke`, `replay`, `restate` and `receipt` results must also have `stale` (a boolean), `stale_mode` (`fail_closed` or `continue_stale`) and `stale_reason` (`expired`, `revoked` or an empty string). The schemas do not define the other fields of a record. The `state` object has the type `object` only.
+- A record object inside a result (`record`, `receipt`, `report`) must have `format: "entelos.record/1"`. A receipt in the `invoke`, `replay`, `restate` and `receipt` results must also have `stale` (a boolean), `stale_mode` (`fail_closed` or `continue_stale`) and `stale_reason` (`expired`, `revoked` or an empty string), `executor_id` (a nonempty string) and `log_cursor` (an integer). The schemas do not define the other fields of a record. The `state` object has the type `object` only.
 - The validator supports only the JSON Schema keywords that the files in `schema/` use.

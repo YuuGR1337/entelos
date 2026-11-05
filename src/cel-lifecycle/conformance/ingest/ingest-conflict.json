@@ -1,0 +1,79 @@
+{
+ "format": "ingest-vector/v1",
+ "id": "ingest-conflict",
+ "description": "The same executor ID and cursor with a different payload gives ingest_conflict. A failed ingest publishes no part of its entries.",
+ "context": {
+  "actor": "executor-a",
+  "roles": [
+   "worker",
+   "reader"
+  ],
+  "scope": "tenant-example",
+  "runner_actor": "fixture-runner",
+  "worker": "executor-a",
+  "functions": [
+   "record.visible"
+  ]
+ },
+ "seed": [
+  {
+   "put": "snapshot",
+   "value": {
+    "function": "record.visible",
+    "scope": "tenant-example",
+    "from": "2026-11-01",
+    "until": "2026-12-01",
+    "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "engine_build": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "stale_mode": "fail_closed"
+   },
+   "expect_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933"
+  }
+ ],
+ "entries": {
+  "e1": {
+   "cursor": 1,
+   "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933",
+   "date": "2026-11-15",
+   "inputs_ref": "sha256:d28ea6c2423723cadc9c2edccc389c89923482944db672f124e6590f53fbf802",
+   "response": {
+    "status": "ok",
+    "value": true,
+    "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+   }
+  },
+  "e2": {
+   "cursor": 2,
+   "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933",
+   "date": "2026-11-15",
+   "inputs_ref": "sha256:769c9068dee945edc52f152d98e488b6a01d4ed1eaf6dc6aef7b646d856870e9",
+   "response": {
+    "status": "ok",
+    "value": false,
+    "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+   }
+  },
+  "e3": {
+   "cursor": 3,
+   "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933",
+   "date": "2026-11-15",
+   "inputs_ref": "sha256:4084f3f2ebd69e670038a35c8c5c935143341968c409fec27e704c32297b5cad",
+   "response": {
+    "status": "ok",
+    "value": false,
+    "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+   },
+   "stale_reason": "expired"
+  }
+ },
+ "steps": [
+  {"name": "first-ingest", "request": {"op": "ingest", "request_key": "k-1", "entries": ["e1"]}, "expect": {"result": {"executor_id": "executor-a", "log_cursor": 1, "added": 1, "receipts": ["sha256:b96129fc8dcd9cf9df8f850adc8cde3b9ab8303731a80a09ed923accde37f776"]}, "reused": false}, "objects": 3, "executors": {"executor-a": ["sha256:b96129fc8dcd9cf9df8f850adc8cde3b9ab8303731a80a09ed923accde37f776"]}},
+  {"name": "changed-response", "request": {"op": "ingest", "request_key": "k-2", "entries": [{"cursor": 1, "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933", "date": "2026-11-15", "inputs_ref": "sha256:d28ea6c2423723cadc9c2edccc389c89923482944db672f124e6590f53fbf802", "response": {"status": "ok", "value": false, "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}}]}, "expect": {"error": "ingest_conflict"}, "objects": 3, "executors": {"executor-a": ["sha256:b96129fc8dcd9cf9df8f850adc8cde3b9ab8303731a80a09ed923accde37f776"]}},
+  {"name": "changed-inputs", "request": {"op": "ingest", "request_key": "k-3", "entries": [{"cursor": 1, "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933", "date": "2026-11-15", "inputs_ref": "sha256:769c9068dee945edc52f152d98e488b6a01d4ed1eaf6dc6aef7b646d856870e9", "response": {"status": "ok", "value": true, "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}}]}, "expect": {"error": "ingest_conflict"}, "objects": 3},
+  {"name": "changed-stale-reason", "request": {"op": "ingest", "request_key": "k-4", "entries": [{"cursor": 1, "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933", "date": "2026-11-15", "inputs_ref": "sha256:d28ea6c2423723cadc9c2edccc389c89923482944db672f124e6590f53fbf802", "response": {"status": "ok", "value": true, "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}, "stale_reason": "revoked"}]}, "expect": {"error": "ingest_conflict"}, "objects": 3},
+  {"name": "new-entry-then-conflict", "request": {"op": "ingest", "request_key": "k-5", "entries": ["e1", "e2", {"cursor": 1, "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933", "date": "2026-11-15", "inputs_ref": "sha256:d28ea6c2423723cadc9c2edccc389c89923482944db672f124e6590f53fbf802", "response": {"status": "ok", "value": false, "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}}]}, "expect": {"error": "ingest_conflict"}, "objects": 3, "executors": {"executor-a": ["sha256:b96129fc8dcd9cf9df8f850adc8cde3b9ab8303731a80a09ed923accde37f776"]}}
+ ]
+}
