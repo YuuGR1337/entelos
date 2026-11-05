@@ -442,6 +442,181 @@
    }
   },
   {
+   "name": "stream-reads-1-byte",
+   "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d",
+   "read_size": 1,
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     },
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "stream-reads-3-bytes",
+   "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d",
+   "read_size": 3,
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "stream-short-read-truncated",
+   "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d000000467b22626f64",
+   "read_size": 2,
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     },
+     {
+      "protocol": "1.0",
+      "request_id": "",
+      "status": "invalid_frame",
+      "diagnostic": {
+       "code": "invalid_frame",
+       "stage": "protocol",
+       "message": {
+        "$type": "string"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "max-frame-unknown-envelope-key",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "r-p",
+    "operation": "inspect",
+    "body": {}
+   },
+   "pad_to": {
+    "in": "envelope",
+    "key_prefix": "pad",
+    "size": 1048576
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-p",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "max-frame-unknown-body-key",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "r-q",
+    "operation": "inspect",
+    "body": {}
+   },
+   "pad_to": {
+    "in": "body",
+    "key_prefix": "pad",
+    "size": 1048576
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-q",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
    "name": "stream-truncated-header",
    "stream_hex": "000001",
    "expect": {

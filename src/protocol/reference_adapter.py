@@ -11,6 +11,7 @@ from git_store import Fault  # noqa: E402
 PROTOCOL='1.0'
 MAJOR,MINOR=1,0
 MAX_FRAME=1048576
+MAX_MESSAGE=1024
 SAFE_INT=2**53-1
 SCHEMAS={p.name[:-len('.schema.json')]:json.loads(p.read_text()) for p in sorted((HERE/'schema').glob('*.schema.json'))}
 ENVELOPE=SCHEMAS.pop('envelope')['$defs']
@@ -120,23 +121,38 @@ class Adapter:
         if not payload:return failure('','invalid_frame','protocol','empty frame'),True
         try:request=parse(payload)
         except ProtocolError as e:return failure('',e.code,'protocol',e.message),e.close
-        return self.message(request),False
+        return limit(self.message(request)),False
     def serve(self,reader,writer):
         """Serve length-prefixed frames until end of stream or a closing error."""
         while True:
-            header=reader.read(4)
+            header=read_exact(reader,4)
             if not header:return
             if len(header)<4:return write_frame(writer,failure('','invalid_frame','protocol','truncated frame header'))
             size=struct.unpack('>I',header)[0]
             if size>MAX_FRAME:return write_frame(writer,failure('','invalid_frame','protocol','frame exceeds the byte bound'))
-            payload=reader.read(size)
+            payload=read_exact(reader,size)
             if len(payload)<size:return write_frame(writer,failure('','invalid_frame','protocol','truncated frame payload'))
             response,close=self.frame(payload)
             write_frame(writer,response)
             if close:return
 
+def read_exact(reader,size):
+    """Read until size bytes or end of stream. A short read is not the end of the stream."""
+    chunks=[];count=0
+    while count<size:
+        chunk=reader.read(size-count)
+        if not chunk:break
+        chunks.append(chunk);count+=len(chunk)
+    return b''.join(chunks)
+
 def failure(request_id,code,stage,message):
+    if len(message)>MAX_MESSAGE:message=message[:MAX_MESSAGE-3]+'...'
     return {'protocol':PROTOCOL,'request_id':request_id,'status':code,'diagnostic':{'code':code,'stage':stage,'message':message}}
 
+def limit(response):
+    """If the canonical response exceeds the frame bound, return a response_too_large failure."""
+    if len(canonical(response))<=MAX_FRAME:return response
+    return failure(response.get('request_id',''),'response_too_large','protocol','the response exceeds the frame byte bound')
+
 def write_frame(writer,response):
-    body=canonical(response);writer.write(struct.pack('>I',len(body))+body);writer.flush()
+    body=canonical(limit(response));writer.write(struct.pack('>I',len(body))+body);writer.flush()

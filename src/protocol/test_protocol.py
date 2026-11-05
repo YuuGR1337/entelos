@@ -55,6 +55,21 @@ def shape(response,operation):
     except ra.ProtocolError as e:return ['response schema: '+e.message]
     return []
 
+class Chunked(io.BytesIO):
+    """A reader that returns at most size bytes for each read, as a raw socket can."""
+    def __init__(self,data,size):super().__init__(data);self.size=size
+    def read(self,n=-1):return super().read(self.size if n<0 else min(n,self.size))
+
+def padded(request,pad):
+    """Add one unknown field so that the canonical payload is exactly pad['size'] bytes.
+    The field name is pad['key_prefix'] and padding. pad['in'] is 'envelope' or 'body'."""
+    def build(key):
+        if pad['in']=='body':return dict(request,body=dict(request['body'],**{key:''}))
+        return dict(request,**{key:''})
+    room=pad['size']-len(ra.canonical(build(pad['key_prefix'])))
+    if room<0:raise ValueError('pad_to is smaller than the request')
+    return ra.canonical(build(pad['key_prefix']+'x'*room))
+
 def frames(raw):
     out=[];stream=io.BytesIO(raw)
     while True:
@@ -69,17 +84,24 @@ def run_file(path):
         for step in doc['steps']:
             name=path.name+':'+step['name'];expect=step['expect']
             if 'stream_hex' in step:
-                out=io.BytesIO();adapter.serve(io.BytesIO(bytes.fromhex(step['stream_hex'])),out)
+                data=bytes.fromhex(step['stream_hex'])
+                reader=Chunked(data,step['read_size']) if 'read_size' in step else io.BytesIO(data)
+                out=io.BytesIO();adapter.serve(reader,out)
                 raw=out.getvalue();got=frames(raw)
                 errors+=match(expect['responses'],got,bound,name)
+                errors+=[name+': response exceeds the frame bound' for r in got if len(ra.canonical(r))>ra.MAX_FRAME]
                 for r in got:
                     errors+=[name+': not canonical'] if ra.canonical(r)+b'' not in raw else []
                     errors+=shape(r,None) if r.get('status')!='ok' else []
                 continue
-            if 'request' in step:payload=ra.canonical(substitute(step['request'],bound))
+            if 'pad_to' in step:
+                payload=padded(substitute(step['request'],bound),step['pad_to'])
+                if len(payload)!=step['pad_to']['size']:errors.append(name+': padded payload has the wrong size')
+            elif 'request' in step:payload=ra.canonical(substitute(step['request'],bound))
             elif 'payload_text' in step:payload=step['payload_text'].encode('utf-8')
             else:payload=bytes.fromhex(step['payload_hex'])
             response,close=adapter.frame(payload)
+            if len(ra.canonical(response))>ra.MAX_FRAME:errors.append(name+': response exceeds the frame bound')
             errors+=match(expect['response'],response,bound,name)
             errors+=shape(response,step.get('request',{}).get('operation'))
             if close!=expect.get('close',False):errors.append(name+': close=%r'%close)
@@ -98,6 +120,20 @@ def coverage():
         if (ra.OPERATIONS[op]['x-entelos-access']=='read')!=(op in READS):errors.append(op+': access differs')
     return errors
 
+class LargeHost:
+    """A stub Host whose result is larger than the frame bound."""
+    def handle(self,q):return {'cursor':'','state':{'blob':'x'*ra.MAX_FRAME}}
+
+def bounds():
+    """A success result that exceeds the frame bound becomes response_too_large."""
+    request={'protocol':'1.0','request_id':'big','operation':'inspect','body':{}}
+    response,close=ra.Adapter(LargeHost()).frame(ra.canonical(request))
+    want={'protocol':'1.0','request_id':'big','status':'response_too_large','diagnostic':{'code':'response_too_large','stage':'protocol','message':{'$type':'string'}}}
+    errors=match(want,response,{},'bounds:large-result')+shape(response,'inspect')
+    out=io.BytesIO();ra.Adapter(LargeHost()).serve(io.BytesIO(struct.pack('>I',len(ra.canonical(request)))+ra.canonical(request)),out)
+    if len(out.getvalue())-4>ra.MAX_FRAME:errors.append('bounds:serve wrote a frame over the bound')
+    return errors+(['bounds:close'] if close else [])
+
 def jcs_vectors():
     errors=[];doc=json.loads((HERE/'vectors/jcs.json').read_text())
     for case in doc['cases']:
@@ -106,7 +142,7 @@ def jcs_vectors():
     return len(doc['cases']),errors
 
 def main():
-    WORK.mkdir(parents=True,exist_ok=True);total=0;errors=coverage()
+    WORK.mkdir(parents=True,exist_ok=True);total=0;errors=coverage()+bounds()
     n,e=jcs_vectors();total+=n;errors+=e
     for path in sorted((HERE/'vectors').glob('session-*.json')):
         n,e=run_file(path);total+=n;errors+=e
