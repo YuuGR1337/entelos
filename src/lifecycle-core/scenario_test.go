@@ -217,8 +217,13 @@ func (d *scenarioDriver) propose(stage string, table Object, source, base string
 	if name == "" {
 		name = stage + "-proposal"
 	}
-	return d.call("author", "propose", name, expected, Object{"function": d.fixture["function"], "from": table["from"], "until": table["until"],
-		"base_snapshot": base, "source_ref": source, "bundle": bundle, "reason": stage + " proposal"})
+	q := Object{"function": d.fixture["function"], "from": table["from"], "until": table["until"],
+		"base_snapshot": base, "source_ref": source, "bundle": bundle, "reason": stage + " proposal"}
+	// A stage that names a stale mode declares it in the proposal.
+	if mode, ok := table["stale_mode"]; ok {
+		q["stale_mode"] = mode
+	}
+	return d.call("author", "propose", name, expected, q)
 }
 
 func (d *scenarioDriver) qualifyDecide(snapshot, plan, prefix string) (Object, string) {
@@ -335,6 +340,10 @@ func (d *scenarioDriver) demonstrate(bundleDir string) (pins Object, err error) 
 	suspension := result(d.call("reviewer", "suspend", "suspend-wrong-future", "ok", Object{"function": fun, "from": correction["from"], "until": correction["until"],
 		"targets": Array{future}, "reason": "stop serving incorrect source data"}))["event_ref"].(string)
 	d.call("caller", "describe", "suspension-no-fallback", "out_of_scope", Object{"function": fun, "date": "2026-11-15"})
+	// The worker loaded the amendment. The amendment declares no stale mode,
+	// so the invocation fails closed when the activation is revoked or expired.
+	invoke("revoked-fails-closed", "activation_revoked", "2026-11-15", amendment["bundle_ref"], original)
+	invoke("expired-fails-closed", "activation_expired", "2026-12-15", amendment["bundle_ref"], original)
 	currentOct := resolve("2026-10-15", nil)
 	enabled := result(d.call("reviewer", "activate", "activate-correction", "ok", Object{"decision_ref": dec3, "targets": Array{future, suspension}}))["event_ref"].(string)
 	correctionCursor := d.cursor()
@@ -355,6 +364,17 @@ func (d *scenarioDriver) demonstrate(bundleDir string) (pins Object, err error) 
 			equal(retained, before["receipt"]) && at(replay, "receipt", "selection", "snapshot_ref") == snap2 &&
 			at(restated, "receipt", "selection", "snapshot_ref") == snap3 && currentOct["snapshot_ref"] == snap1,
 		Object{"before": before, "after": after, "replay": replay, "restatement": restated, "retained_old_receipt": retained})
+	// The correction declares continue_stale. After its until date, the loaded
+	// correction gives the answer, and the receipt is stale. A reader finds
+	// the stale field with the receipt read.
+	staleCall := result(invoke("expired-continue-stale", "ok", "2026-12-15", corrected["bundle_ref"], original))
+	staleRead := d.call("reader", "receipt", "", "ok", Object{"receipt_ref": staleCall["receipt_ref"]})
+	d.check("stale-continuation", "Does an expired continue_stale activation give a stale receipt, while live answers stay not stale?",
+		at(staleCall, "actual", "value") == exp["stale_after_expiry"] && staleRead["stale"] == true && staleRead["stale_mode"] == "continue_stale" &&
+			staleRead["stale_reason"] == "expired" && at(staleRead, "selection", "snapshot_ref") == snap3 &&
+			at(after, "receipt", "stale") == false && at(after, "receipt", "stale_mode") == "continue_stale" &&
+			at(before, "receipt", "stale") == false && at(before, "receipt", "stale_mode") == "fail_closed",
+		Object{"stale": staleRead, "live_correction": after["receipt"], "live_amendment": before["receipt"]})
 	complete := result(d.call("other-maintainer", "checkpoint", "complete-correction", "ok", Object{"task_id": observation["task_id"], "checkpoint": taken["checkpoint"],
 		"token": taken["token"], "status": "complete", "note": "Source correction activated; original answer replayed and correction restated.", "correction_snapshot": snap3}))
 	d.check("restart-and-fenced-task", "Can a fresh process resume a saved task while rejecting the old owner?",
@@ -366,7 +386,7 @@ func (d *scenarioDriver) demonstrate(bundleDir string) (pins Object, err error) 
 		Object{"sources": state["sources"], "plans": state["plans"], "outbox": state["outbox"], "receipts": state["receipts"]})
 	return Object{"initial_snapshot": snap1, "future_snapshot": snap2, "correction_snapshot": snap3, "future_event": future, "correction_event": enabled,
 		"decision": dec3, "old_receipt": before["receipt_ref"], "new_receipt": restated["receipt_ref"], "historical_cursor": historical,
-		"correction_cursor": correctionCursor}, nil
+		"correction_cursor": correctionCursor, "stale_receipt": staleCall["receipt_ref"]}, nil
 }
 
 // scenarioRun is the one scenario run of this test process. The Host tests
@@ -465,12 +485,12 @@ func requireScenario(t *testing.T) scenarioRun {
 	return run
 }
 
-// The scenario has 68 steps and 10 checks. Each check passed, or the
+// The scenario has 72 steps and 11 checks. Each check passed, or the
 // scenario stopped with an error.
 func TestLifecycleScenario(t *testing.T) {
 	run := requireScenario(t)
-	if len(run.driver.trace) != 68 || len(run.driver.checks) != 10 {
-		t.Fatalf("%d steps and %d checks, want 68 and 10", len(run.driver.trace), len(run.driver.checks))
+	if len(run.driver.trace) != 72 || len(run.driver.checks) != 11 {
+		t.Fatalf("%d steps and %d checks, want 72 and 11", len(run.driver.trace), len(run.driver.checks))
 	}
 	for _, x := range run.driver.trace {
 		step := x.(Object)

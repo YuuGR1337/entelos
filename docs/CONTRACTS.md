@@ -52,7 +52,7 @@ The CLI reads one JSON object per line, in a loop, so one process can take many 
 |---|---|---|
 | `source` | reviewer | `function`, `from`, `until`, `text`, `supersedes`, `reason` |
 | `plan` | reviewer | `source_ref`, `cases`, `origin`, `supersedes` |
-| `propose` | author | `function`, `from`, `until`, `base_snapshot`, `source_ref`, `bundle`, `reason` |
+| `propose` | author | `function`, `from`, `until`, `base_snapshot`, `source_ref`, `bundle`, `reason`, `stale_mode` |
 | `qualify` | runner | `snapshot_ref`, `plan_ref` |
 | `decide` | reviewer | `report_ref`, `reason` |
 | `activate` | reviewer | `decision_ref`, `targets` |
@@ -72,13 +72,34 @@ The CLI reads one JSON object per line, in a loop, so one process can take many 
 | `record` | reviewer | `ref`, `kind`, `cursor` |
 | `receipt` | reader | `receipt_ref` |
 
-`source.supersedes` and `plan.supersedes` default to an empty list. `activate.targets` defaults to an empty list. `checkpoint.correction_snapshot` defaults to an empty string. `describe`, `resolve`, `inspect`, `record` and `receipt` are read operations; the other operations are writes.
+`source.supersedes` and `plan.supersedes` default to an empty list. `activate.targets` defaults to an empty list. `propose.stale_mode` defaults to `fail_closed`. `checkpoint.correction_snapshot` defaults to an empty string. `describe`, `resolve`, `inspect`, `record` and `receipt` are read operations; the other operations are writes.
 
 ## Proposal base rule
 
 `propose` targets one function, scope and date interval. `base_snapshot` must equal the current proposal head for that function and scope. The head advances on every stored proposal, including a proposal that did not pass qualification or was never activated, so a different value is `stale_proposal`. The first proposal for the key uses an empty `base_snapshot`.
 
 The bundle must name all four components. The manifest's `function_id` must equal the proposal's `function`, or the call is `contract_changed`. When `base_snapshot` is not empty, the new manifest must keep the base manifest's `environment_ref`, `caller_variables`, `profile` and `limits`; a difference is `contract_changed`. A later proposal may change the rule and the fixed data.
+
+## Expiry and revocation
+
+An activation is an `enable` event with a half-open interval from `from` to `until`. The lifecycle uses the existing records for expiry and revocation:
+
+- An activation is expired at a date that is at or after its `until` date.
+- An activation is revoked at a date in its interval if a later event masks it. A `suspend` event is the usual mask. An `enable` event with `targets` is also a mask.
+
+The proposal declares the stale mode of a revision in `stale_mode`. The two values are `fail_closed` (the default) and `continue_stale`. Any other value is `invalid_request`. The snapshot records the mode. Qualification, the decision and the activation bind that snapshot, so the reviewer approves the mode with the revision. `invoke` has no `stale_mode` field, and a caller cannot propose. Thus a caller cannot select the mode. To change the mode, propose a new revision and qualify, decide and activate it.
+
+If an activation is live at the invocation date, `invoke` uses it, and the receipt is not stale. If no activation is live, `invoke` examines the activation that the worker loaded:
+
+1. If the loaded activation is not an `enable` event of this function and scope, or the date is before its `from` date, the result is `out_of_scope`.
+2. If its revision has `fail_closed`, the result is `activation_expired` or `activation_revoked`. The Host publishes no state.
+3. If its revision has `continue_stale`, the loaded activation gives the answer. The receipt has `stale` `true` and `stale_reason` `expired` or `revoked`.
+
+Each receipt records `stale_mode` (the mode of the selected revision), `stale` (a boolean) and `stale_reason` (`expired`, `revoked` or an empty string). A replay keeps the stale reason of the old receipt, because it runs the old selection again. A restatement always selects a live activation, so it is never stale. The `describe`, `resolve` and `load` operations do not continue a stale activation. They give `out_of_scope`.
+
+To find the stale receipts, use the existing reads. `inspect` gives `state.receipts`, the list of receipt references. Read each receipt with `receipt` and keep the receipts with `stale` `true`. There is no stale index. The scan reads each receipt once.
+
+The Host compares the invocation `date` with the activation interval. It reads no clock. An executor that sets `date` from its local clock uses only that clock. There is no clock synchronization policy.
 
 ## Content references for a stage bundle
 

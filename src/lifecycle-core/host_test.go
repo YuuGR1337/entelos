@@ -484,3 +484,136 @@ func TestUnknownRecordFormatFailsClosed(t *testing.T) {
 		}
 	}
 }
+
+// A proposal without a stale mode records fail_closed. The scenario steps
+// revoked-fails-closed and expired-fails-closed show that such a revision
+// stops on revocation and on expiry.
+func TestStaleModeIsFailClosedByDefault(t *testing.T) {
+	f := newFixture(t)
+	view, _ := f.store.Read(nil)
+	for name, want := range map[string]string{"initial_snapshot": "fail_closed", "future_snapshot": "fail_closed", "correction_snapshot": "continue_stale"} {
+		snapshot, err := view.Get(f.pin(name), "snapshot")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if snapshot["stale_mode"] != want {
+			t.Fatalf("%s: stale_mode %v, want %s", name, snapshot["stale_mode"], want)
+		}
+	}
+	steps := map[string]string{}
+	for _, x := range requireScenario(t).driver.trace {
+		step := x.(Object)
+		steps[step["name"].(string)] = at(step, "response", "status").(string)
+	}
+	if steps["revoked-fails-closed"] != "activation_revoked" || steps["expired-fails-closed"] != "activation_expired" {
+		t.Fatalf("fail-closed steps: %v %v", steps["revoked-fails-closed"], steps["expired-fails-closed"])
+	}
+}
+
+// The Host refuses a stale mode that is not fail_closed or continue_stale.
+// The refused proposal publishes no state.
+func TestInvalidStaleModeIsRefused(t *testing.T) {
+	f := newFixture(t)
+	before := f.root()
+	author := f.host("author", nil)
+	for _, mode := range []any{"continue", "", true, Array{"continue_stale"}} {
+		_, err := author.Handle(f.request("propose", Object{"function": "record.visible", "from": "2026-11-01", "until": "2026-12-01",
+			"base_snapshot": f.pin("correction_snapshot"), "source_ref": "forged", "bundle": Object{}, "reason": "invalid mode", "stale_mode": mode}))
+		if fault, ok := err.(*Fault); !ok || fault.Code != "invalid_request" || !strings.Contains(fault.Message, "stale_mode") {
+			t.Fatalf("stale_mode %v: got %v", mode, err)
+		}
+	}
+	if f.root() != before {
+		t.Fatal("a refused proposal published state")
+	}
+}
+
+// A caller cannot select the stale mode. The invoke, describe and load
+// requests have no stale_mode field, and a caller cannot propose.
+func TestCallerCannotSelectStaleMode(t *testing.T) {
+	f := newFixture(t)
+	before := f.root()
+	view, _ := f.store.Read(nil)
+	snapshot, _ := view.Get(f.pin("future_snapshot"), "snapshot")
+	caller := f.host("caller", nil)
+	invoke := f.request("invoke", Object{"function": "record.visible", "date": "2026-12-15", "expected_bundle_ref": snapshot["bundle_ref"],
+		"inputs": Object{"state": "reviewed", "archived": false}, "stale_mode": "continue_stale"})
+	for _, q := range []Object{invoke, {"op": "describe", "function": "record.visible", "date": "2026-12-15", "stale_mode": "continue_stale"}} {
+		_, err := caller.Handle(q)
+		if fault, ok := err.(*Fault); !ok || fault.Code != "invalid_request" || !strings.Contains(fault.Message, "unexpected fields: stale_mode") {
+			t.Fatalf("%v: got %v", q["op"], err)
+		}
+	}
+	f.expect("invalid_request")(f.host("worker", nil).Handle(f.request("load", Object{"function": "record.visible", "date": "2026-12-15", "stale_mode": "continue_stale"})))
+	f.expect("forbidden")(caller.Handle(f.request("propose", Object{"function": "record.visible", "from": "2026-11-01", "until": "2026-12-01",
+		"base_snapshot": f.pin("correction_snapshot"), "source_ref": "forged", "bundle": Object{}, "reason": "caller mode", "stale_mode": "continue_stale"})))
+	if f.root() != before {
+		t.Fatal("a refused request published state")
+	}
+}
+
+// A continue_stale revision that a reviewer suspends still gives an answer
+// from the loaded activation, and the receipt is stale with the reason
+// revoked. Before the from date of the loaded activation, the invocation
+// stays out_of_scope. The reads do not continue.
+func TestContinueStaleOnRevocation(t *testing.T) {
+	f := newFixture(t)
+	view, _ := f.store.Read(nil)
+	snapshot, _ := view.Get(f.pin("correction_snapshot"), "snapshot")
+	f.ok(f.host("reviewer", nil).Handle(f.request("suspend", Object{"function": "record.visible", "from": "2026-11-01", "until": "2026-12-01",
+		"targets": Array{f.pin("correction_event")}, "reason": "revoke the correction"})))
+	caller := f.host("caller", nil)
+	call := func(date, key string) (any, error) {
+		return caller.Handle(Object{"op": "invoke", "function": "record.visible", "date": date, "expected_bundle_ref": snapshot["bundle_ref"],
+			"inputs": Object{"state": "reviewed", "archived": false}, "expected_revision": f.root(), "request_key": key})
+	}
+	out := f.ok(call("2026-11-15", "revoked-continue"))
+	receipt := out["result"].(Object)["receipt"].(Object)
+	if receipt["stale"] != true || receipt["stale_reason"] != "revoked" || receipt["stale_mode"] != "continue_stale" ||
+		at(receipt, "selection", "event_ref") != f.pin("correction_event") {
+		t.Fatalf("receipt %v", receipt)
+	}
+	f.expect("out_of_scope")(f.host("reader", nil).Handle(resolveRequest(nil)))
+	before := f.root()
+	f.expect("out_of_scope")(call("2026-09-15", "before-from"))
+	if f.root() != before {
+		t.Fatal("a refused invocation published state")
+	}
+}
+
+// A reader finds each stale receipt with the existing reads: inspect lists
+// the receipt references, and the receipt read gives the stale field. A
+// replay of a stale receipt is also stale. A restatement is never stale.
+func TestStaleReceiptsCanBeFound(t *testing.T) {
+	f := newFixture(t)
+	reader := f.host("reviewer", nil)
+	stale := func() []any {
+		state := f.ok(reader.Handle(Object{"op": "inspect"}))["state"].(Object)
+		var found []any
+		for _, ref := range state["receipts"].(Array) {
+			receipt := f.ok(reader.Handle(Object{"op": "receipt", "receipt_ref": ref}))
+			if _, ok := receipt["stale"].(bool); !ok {
+				t.Fatalf("receipt %v has no stale field", ref)
+			}
+			if receipt["stale"] == true {
+				found = append(found, ref)
+			}
+		}
+		return found
+	}
+	if got := stale(); !equal(Array(got), Array{f.pin("stale_receipt")}) {
+		t.Fatalf("stale receipts %v, want %v", got, f.pin("stale_receipt"))
+	}
+	replay := f.ok(reader.Handle(f.request("replay", Object{"receipt_ref": f.pin("stale_receipt"), "reason": "replay a stale answer"})))
+	receipt := replay["result"].(Object)["receipt"].(Object)
+	if receipt["stale"] != true || receipt["stale_reason"] != "expired" || receipt["matches_original"] != true {
+		t.Fatalf("replay receipt %v", receipt)
+	}
+	if got := stale(); len(got) != 2 || !within(replay["result"].(Object)["receipt_ref"], Array(got)) {
+		t.Fatalf("stale receipts after replay %v", got)
+	}
+	restated := f.ok(reader.Handle(Object{"op": "receipt", "receipt_ref": f.pin("new_receipt")}))
+	if restated["stale"] != false || restated["stale_reason"] != "" {
+		t.Fatalf("restated receipt %v", restated)
+	}
+}

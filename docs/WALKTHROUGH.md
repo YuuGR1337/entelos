@@ -151,12 +151,13 @@ The trace shows these steps. The values come from one run on 2026-10-29.
 7. The November call for the original input `{"state":"reviewed","archived":false}` gives `true`. This is the receipt that the correction must preserve.
 8. An observer reports the discrepancy against that receipt. This opens a correction task. A maintainer claims it. A reviewer gives it to another maintainer, and the earlier owner gets `stale_fence`.
 9. The reviewer records the corrected source and plan. The old amendment report becomes `stale_qualification`. October keeps its evidence.
-10. The reviewer suspends the incorrect November activation. `describe` for November then gives `out_of_scope`. There is no fallback to an earlier version.
+10. The reviewer suspends the incorrect November activation. `describe` for November then gives `out_of_scope`. There is no fallback to an earlier version. The worker still has the amendment loaded. The amendment declares no stale mode, so a November call gives `activation_revoked` and a call for 2026-12-15 gives `activation_expired`.
 11. The reviewer activates the correction. A call with the old bundle reference gives `artifact_mismatch`. A call before the new load gives `revision_not_loaded`.
 12. After the load, the same November input gives `false`.
 13. Replay of the old receipt gives `true` again, with the amendment snapshot. Restatement at the correction cursor gives `false`, with the correction snapshot. A replay with changed inputs gives `input_mismatch`.
+14. The correction declares `stale_mode` `continue_stale`. A call for 2026-12-15 is after its `until` date. The loaded correction gives `false`, and the receipt has `stale` `true` and `stale_reason` `expired`.
 
-The fixture `expected` block states the five answers before the run: `true`, `true`, `false`, `true` and `false`. The scenario checks the observed values against that block.
+The fixture `expected` block states the six answers before the run: `true`, `true`, `false`, `true`, `false` and `false`. The scenario checks the observed values against that block.
 
 ## 6. Call as a caller
 

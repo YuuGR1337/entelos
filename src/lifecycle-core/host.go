@@ -24,7 +24,7 @@ var schema = map[string]struct {
 }{
 	"source":     {"reviewer", []string{"function", "from", "until", "text", "supersedes", "reason"}},
 	"plan":       {"reviewer", []string{"source_ref", "cases", "origin", "supersedes"}},
-	"propose":    {"author", []string{"function", "from", "until", "base_snapshot", "source_ref", "bundle", "reason"}},
+	"propose":    {"author", []string{"function", "from", "until", "base_snapshot", "source_ref", "bundle", "reason", "stale_mode"}},
 	"qualify":    {"runner", []string{"snapshot_ref", "plan_ref"}},
 	"decide":     {"reviewer", []string{"report_ref", "reason"}},
 	"activate":   {"reviewer", []string{"decision_ref", "targets"}},
@@ -448,7 +448,55 @@ func (h *Host) resolve(v *View, function any, at any) Object {
 	if len(active) == 0 {
 		fail("out_of_scope", "no enabled revision for the exact function/scope/date", "resolve")
 	}
-	event := active[order[0]]
+	return h.selection(v, function, at, active[order[0]])
+}
+
+// Stale modes. The proposal declares the mode of a revision. The snapshot
+// records it, and qualification, the decision and the activation bind that
+// snapshot. A caller cannot select a mode.
+const (
+	failClosed    = "fail_closed"
+	continueStale = "continue_stale"
+)
+
+// serving gives the selection for an invocation and the stale reason. The
+// reason is "" if an activation is live at the date. If no activation is
+// live, serving examines the activation that the worker loaded. If the date
+// is at or after its until date, the activation expired. If the date is in
+// its interval, a later registry event masked it, and it is revoked. In the
+// fail_closed mode, the invocation stops with activation_expired or
+// activation_revoked. In the continue_stale mode, the loaded activation
+// gives the answer, and the receipt is stale. The Host uses only the
+// invocation date. It does not read or synchronize a clock.
+func (h *Host) serving(v *View, function any, at any) (Object, string) {
+	order, active := h.live(v, function, at)
+	if len(active) > 0 {
+		return h.selection(v, function, at, active[order[0]]), ""
+	}
+	loaded := lookup(item(v.State, "workers"), h.ctx("worker"), Object{})
+	var event Object
+	for _, x := range h.events(v) {
+		if equal(x["ref"], lookup(loaded, "event_ref", nil)) {
+			event = x
+		}
+	}
+	probe := Object{"function": function, "scope": h.ctx("scope")}
+	if event == nil || !equal(item(event, "kind"), "enable") || !same(event, probe) || less(at, item(event, "from")) {
+		fail("out_of_scope", "no enabled revision for the exact function/scope/date", "resolve")
+	}
+	reason, code := "revoked", "activation_revoked"
+	if lessEqual(item(event, "until"), at) {
+		reason, code = "expired", "activation_expired"
+	}
+	snapshot := h.scoped(v, item(event, "snapshot_ref"), "snapshot")
+	if !equal(lookup(snapshot, "stale_mode", nil), continueStale) {
+		fail(code, "the loaded activation is "+reason+" at this date; the revision fails closed", "resolve")
+	}
+	return h.selection(v, function, at, event), reason
+}
+
+// selection is the resolved selection of one enable event.
+func (h *Host) selection(v *View, function any, at any, event Object) Object {
 	snapshot := h.scoped(v, item(event, "snapshot_ref"), "snapshot")
 	return Object{"function": function, "scope": h.ctx("scope"), "date": at, "registry_cursor": v.Cursor,
 		"event_ref": item(event, "ref"), "snapshot_ref": item(event, "snapshot_ref"), "bundle_ref": item(snapshot, "bundle_ref"),
@@ -474,7 +522,10 @@ func (h *Host) readOperation(op string, q Object) any {
 	return Object{"cursor": v.Cursor, "selection": selected, "callable": desc}
 }
 
-func (h *Host) receipt(v *View, selection Object, inputs []byte, key any, mode string, previous, reason, original any) Object {
+// receipt runs the selection and records a receipt. staleReason is "" for
+// a receipt that is not stale. Each receipt records the stale mode of the
+// selected snapshot, and stale is true only for a continue_stale answer.
+func (h *Host) receipt(v *View, selection Object, inputs []byte, key any, mode string, previous, reason, original any, staleReason string) Object {
 	snapshot := h.scoped(v, item(selection, "snapshot_ref"), "snapshot")
 	if !equal(must(h.Runtime.Build()), item(selection, "engine_build")) {
 		fail("implementation_unavailable", "exact replay/execution build unavailable", "runtime")
@@ -491,7 +542,8 @@ func (h *Host) receipt(v *View, selection Object, inputs []byte, key any, mode s
 	record := Object{"function": item(selection, "function"), "scope": item(selection, "scope"), "mode": mode, "selection": selection,
 		"inputs_ref": inputRef, "response_ref": responseRef, "actual_bundle": item(actual, "bundle_ref"),
 		"engine_build": item(actual, "implementation_ref"), "lifecycle_build": h.BuildRef, "invocation_id": key,
-		"previous_receipt": previous, "reason": reason}
+		"previous_receipt": previous, "reason": reason, "stale_mode": lookup(snapshot, "stale_mode", failClosed),
+		"stale": staleReason != "", "stale_reason": staleReason}
 	if truthy(original) {
 		record["matches_original"] = equal(responseRef, original)
 	}
@@ -623,6 +675,10 @@ func (h *Host) apply(v *View, op string, q Object) any {
 		return Object{"plan_ref": ref}
 	case "propose":
 		target := h.target(q)
+		staleMode := lookup(q, "stale_mode", failClosed)
+		if !within(staleMode, Array{failClosed, continueStale}) {
+			fail("invalid_request", "stale_mode must be fail_closed or continue_stale", "")
+		}
 		headKey := strings.TrimSpace(string(Encode(Array{target["function"], target["scope"]})))
 		heads := object(item(state, "heads"))
 		head, ok := heads[headKey]
@@ -672,7 +728,8 @@ func (h *Host) apply(v *View, op string, q Object) any {
 			refs[k] = v.PutRaw(Mimes[k], raw)
 		}
 		snapshot := merge(target, Object{"base_snapshot": q["base_snapshot"], "source_ref": q["source_ref"], "files": refs,
-			"bundle_ref": item(desc, "bundle_ref"), "engine_build": item(desc, "implementation_ref"), "reason": item(q, "reason"), "producer": actor})
+			"bundle_ref": item(desc, "bundle_ref"), "engine_build": item(desc, "implementation_ref"), "reason": item(q, "reason"), "producer": actor,
+			"stale_mode": staleMode})
 		ref := v.Put("snapshot", snapshot)
 		heads[headKey] = ref
 		return Object{"snapshot_ref": ref, "bundle_ref": item(desc, "bundle_ref")}
@@ -738,7 +795,7 @@ func (h *Host) apply(v *View, op string, q Object) any {
 		object(item(state, "workers"))[h.ctx("worker")] = loaded
 		return loaded
 	case "invoke":
-		selection := h.resolve(v, item(q, "function"), item(q, "date"))
+		selection, staleReason := h.serving(v, item(q, "function"), item(q, "date"))
 		if !equal(selection["bundle_ref"], item(q, "expected_bundle_ref")) {
 			fail("artifact_mismatch", "discover the selected bundle before invocation", "")
 		}
@@ -747,7 +804,7 @@ func (h *Host) apply(v *View, op string, q Object) any {
 			!equal(lookup(loaded, "engine_build", nil), selection["engine_build"]) {
 			fail("revision_not_loaded", "desired revision differs from observed worker load", "runtime")
 		}
-		return h.receipt(v, selection, Encode(item(q, "inputs")), key, "invoke", "", "", "")
+		return h.receipt(v, selection, Encode(item(q, "inputs")), key, "invoke", "", "", "", staleReason)
 	case "replay", "restate":
 		old := h.scoped(v, item(q, "receipt_ref"), "receipt")
 		if !within(q["receipt_ref"], item(state, "receipts")) {
@@ -786,10 +843,15 @@ func (h *Host) apply(v *View, op string, q Object) any {
 			fail("invalid_request", "forensic execution reason required", "")
 		}
 		var original any = ""
+		staleReason := ""
 		if op == "replay" {
+			// A replay runs the old selection again. Thus it keeps the stale
+			// reason of the old receipt. A restatement selects a live
+			// activation, so it is never stale.
 			original = item(old, "response_ref")
+			staleReason, _ = lookup(old, "stale_reason", "").(string)
 		}
-		return h.receipt(v, selection, inputs, key, op, q["receipt_ref"], q["reason"], original)
+		return h.receipt(v, selection, inputs, key, op, q["receipt_ref"], q["reason"], original, staleReason)
 	case "observe":
 		receipt := h.scoped(v, item(q, "receipt_ref"), "receipt")
 		if !within(item(q, "route"), Array{"source", "artifact", "contract", "test", "runtime"}) {
