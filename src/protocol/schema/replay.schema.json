@@ -54,6 +54,7 @@
          "const": "entelos.record/1"
         },
         "log_cursor": {
+         "minimum": 1,
          "type": "integer"
         },
         "stale": {

@@ -5,6 +5,7 @@ package protocol
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -138,6 +139,24 @@ func sameValue(a, b any) bool {
 	return err1 == nil && err2 == nil && string(x) == string(y)
 }
 
+// intText gives the decimal text of an integer value.
+func intText(v any) string {
+	if n, ok := v.(lifecycle.Int); ok {
+		return n.Text
+	}
+	return fmt.Sprint(v)
+}
+
+// bigInt gives a schema bound as an exact integer. A bound that is not an
+// integer is a schema error, so it compares as zero.
+func bigInt(v any) *big.Int {
+	n, ok := new(big.Int).SetString(intText(v), 10)
+	if !ok {
+		return new(big.Int)
+	}
+	return n
+}
+
 func isInteger(v any) bool {
 	switch v.(type) {
 	case lifecycle.Int, int, int64:
@@ -199,6 +218,15 @@ func (s *Schemas) Validate(schema lifecycle.Object, value any, where string, roo
 		}
 		if p, has := schema["pattern"].(string); has && !s.patterns[p].MatchString(str) {
 			return invalid("%s does not match its pattern", where)
+		}
+	}
+	if isInteger(value) {
+		n := bigInt(value)
+		if bound, has := schema["minimum"]; has && n.Cmp(bigInt(bound)) < 0 {
+			return invalid("%s is too small", where)
+		}
+		if bound, has := schema["maximum"]; has && n.Cmp(bigInt(bound)) > 0 {
+			return invalid("%s is too large", where)
 		}
 	}
 	if list, ok := value.(lifecycle.Array); ok {

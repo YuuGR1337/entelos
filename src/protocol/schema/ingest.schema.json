@@ -8,6 +8,8 @@
       "additionalProperties": false,
       "properties": {
        "cursor": {
+        "maximum": 9007199254740991,
+        "minimum": 1,
         "type": "integer"
        },
        "date": {
@@ -80,6 +82,7 @@
        "type": "string"
       },
       "log_cursor": {
+       "minimum": 1,
        "type": "integer"
       },
       "receipts": {

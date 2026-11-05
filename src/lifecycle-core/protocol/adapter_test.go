@@ -191,3 +191,15 @@ func TestBodyCannotReplaceOperation(t *testing.T) {
 		}
 	}
 }
+
+// The validator applies minimum and maximum to each integer, also above
+// the range of int64.
+func TestIntegerBounds(t *testing.T) {
+	s := &Schemas{}
+	schema := lifecycle.Object{"type": "integer", "minimum": lifecycle.Int{Text: "1"}, "maximum": lifecycle.Int{Text: "9007199254740991"}}
+	for text, valid := range map[string]bool{"0": false, "1": true, "9007199254740991": true, "9007199254740992": false, "99999999999999999999": false} {
+		if err := s.Validate(schema, lifecycle.Int{Text: text}, "cursor", nil); (err == nil) != valid {
+			t.Errorf("%s: got %v", text, err)
+		}
+	}
+}

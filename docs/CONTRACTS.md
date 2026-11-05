@@ -126,7 +126,7 @@ The Host is the executor for `invoke`, `replay` and `restate`. Each of these rec
 | `date` | The invocation date, as an ISO date. |
 | `inputs_ref` | The input digest. |
 | `response` | The answer object of the executor. Its `bundle_ref` must equal the `bundle_ref` of the snapshot, or the result is `artifact_mismatch`. |
-| `stale_reason` | Optional: `expired`, `revoked` or an empty string. |
+| `stale_reason` | Optional: `expired`, `revoked` or an empty string. The default is an empty string. An entry has no `stale` field. The Host derives `stale` on the receipt, and an entry with `stale` is `invalid_request`. |
 | `inputs` | Optional: the raw inputs. Only the upload policy permits this field. |
 
 An `enable` event of the registry for this function and scope must name the pinned snapshot and have `from` at or before the entry date. Else the result is `out_of_scope` (stage `resolve`). The Host always keeps the answer of a known activation, because a user saw it. It does not refuse an entry because the stale reason of the executor differs from its own view. This rule also applies to a `fail_closed` snapshot.
@@ -141,7 +141,7 @@ An entry has no `executor_id` field, and an unknown field is `invalid_request`. 
 
 The Host makes one receipt record for each entry. The record has two parts:
 
-- The executor claim: `mode` `ingest`, the provenance fields, a `selection` with `function`, `scope`, `date`, `snapshot_ref`, `bundle_ref` and `engine_build` from the snapshot, `response_ref`, `stale_mode` from the snapshot, `stale` and `stale_reason`. `stale` and `stale_reason` are the statement of the executor.
+- The executor claim: `mode` `ingest`, the provenance fields, a `selection` with `function`, `scope`, `date`, `snapshot_ref`, `bundle_ref` and `engine_build` from the snapshot, `response_ref`, `stale_mode` from the snapshot, `stale` and `stale_reason`. `stale_reason` is the statement of the executor. The Host sets `stale` to `true` only if `stale_reason` is not empty.
 - The host fields: `host_stale_reason`, the view of the Host at ingest, and `host_checked_events`, the number of registry events that the Host examined. A later event can change the view of the Host, but not a stored receipt.
 
 The record has no `lifecycle_build`, so a new Host build makes the same claim from the same entry.
@@ -163,7 +163,7 @@ The raw inputs stay with the executor by default. The host context field `upload
 
 To audit the ingested receipts, use `inspect` for `state.executors`, then read each receipt with `receipt`:
 
-- A receipt with `stale` `true` is stale in the claim of the executor.
+- A receipt with `stale` `true` (a `stale_reason` that is not empty) is stale in the claim of the executor.
 - A receipt with a `host_stale_reason` that is not empty is stale in the view of the Host.
 - A receipt with `stale_reason` different from `host_stale_reason` is a mismatch.
 - A stale receipt with `stale_mode` `fail_closed` is an answer that `invoke` refuses. The Host keeps it to record what the user saw.

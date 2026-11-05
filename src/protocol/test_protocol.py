@@ -69,6 +69,9 @@ def validate(schema,value,where,root):
         # Each schema pattern is anchored with ^ and $. In Python, $ also matches before a final newline,
         # so the check uses fullmatch, as $ does in ECMA-262.
         if 'pattern' in schema and not re.fullmatch(schema['pattern'],value):raise SchemaError(where+' does not match its pattern')
+    if isinstance(value,int) and not isinstance(value,bool):
+        if 'minimum' in schema and value<schema['minimum']:raise SchemaError(where+' is too small')
+        if 'maximum' in schema and value>schema['maximum']:raise SchemaError(where+' is too large')
     if isinstance(value,list):
         if len(value)<schema.get('minItems',0):raise SchemaError(where+' has too few items')
         for i,item in enumerate(value):
