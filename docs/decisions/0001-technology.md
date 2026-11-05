@@ -1,6 +1,6 @@
 # 0001 Technology for the core, sidecar and protocol
 
-- Status: accepted
+- Status: accepted; item 3 amended by [0002](0002-browser-executor.md) (browser executor)
 - Date: 2026-11-05
 - Decided by: the maintainer
 - Issue: [#85](https://github.com/mohanraj00/entelos/issues/85), part of [M6](https://github.com/mohanraj00/entelos/issues/77)
@@ -51,7 +51,7 @@ The trade-off: there are no generated typed clients. A thin client for each lang
 | Pure JavaScript executor | Good for web and React Native apps. It is a second CEL implementation, so each rule needs qualification on both engines, and the receipt must record the engine. |
 | Go executor compiled to WASM, called from JavaScript | One CEL implementation. The binary is several MB (unmeasured). The React Native Hermes engine does not run WASM by default. |
 
-The edge apps are native Swift and Kotlin apps, so gomobile is the best fit. If a web or React Native app becomes a target, examine the two JavaScript options again.
+The edge apps are native Swift and Kotlin apps, so gomobile is the best fit. Decision [0002](0002-browser-executor.md) adds web applications as a target, with the Go executor compiled to WASM.
 
 ## Consequences
 

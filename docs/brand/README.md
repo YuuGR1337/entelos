@@ -16,7 +16,7 @@ The mark is three open rings around a center dot. The dot is the goal. The open 
 
 ## Colours
 
-Valam-class apps keep the neutral base and can replace the accent slot.
+Vertical applications keep the neutral base and can replace the accent slot.
 
 | Role | Name | Hex |
 |---|---|---|
