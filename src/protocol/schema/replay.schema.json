@@ -46,8 +46,17 @@
       },
       "receipt": {
        "properties": {
+        "executor_id": {
+         "minLength": 1,
+         "type": "string"
+        },
         "format": {
          "const": "entelos.record/1"
+        },
+        "log_cursor": {
+         "maximum": 9007199254740991,
+         "minimum": 1,
+         "type": "integer"
         },
         "stale": {
          "type": "boolean"
@@ -70,7 +79,9 @@
         "format",
         "stale",
         "stale_mode",
-        "stale_reason"
+        "stale_reason",
+        "executor_id",
+        "log_cursor"
        ],
        "type": "object"
       },

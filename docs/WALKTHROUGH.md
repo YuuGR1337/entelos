@@ -156,6 +156,7 @@ The trace shows these steps. The values come from one run on 2026-10-29.
 12. After the load, the same November input gives `false`.
 13. Replay of the old receipt gives `true` again, with the amendment snapshot. Restatement at the correction cursor gives `false`, with the correction snapshot. A replay with changed inputs gives `input_mismatch`.
 14. The correction declares `stale_mode` `continue_stale`. A call for 2026-12-15 is after its `until` date. The loaded correction gives `false`, and the receipt has `stale` `true` and `stale_reason` `expired`.
+15. In the Go scenario only, a simulated executor ingests one log entry twice. The second ingest adds no receipt. A changed answer at the same cursor gives `ingest_conflict`.
 
 The fixture `expected` block states the six answers before the run: `true`, `true`, `false`, `true`, `false` and `false`. The scenario checks the observed values against that block.
 

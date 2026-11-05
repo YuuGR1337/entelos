@@ -71,8 +71,9 @@ The CLI reads one JSON object per line, in a loop, so one process can take many 
 | `inspect` | reviewer | `cursor` |
 | `record` | reviewer | `ref`, `kind`, `cursor` |
 | `receipt` | reader | `receipt_ref` |
+| `ingest` | worker | `entries` |
 
-`source.supersedes` and `plan.supersedes` default to an empty list. `activate.targets` defaults to an empty list. `propose.stale_mode` defaults to `fail_closed`. `checkpoint.correction_snapshot` defaults to an empty string. `describe`, `resolve`, `inspect`, `record` and `receipt` are read operations; the other operations are writes.
+`source.supersedes` and `plan.supersedes` default to an empty list. `activate.targets` defaults to an empty list. `propose.stale_mode` defaults to `fail_closed`. `checkpoint.correction_snapshot` defaults to an empty string. A log entry in `ingest.entries` has no default fields except `stale_reason`, which defaults to an empty string. `describe`, `resolve`, `inspect`, `record` and `receipt` are read operations; the other operations are writes.
 
 ## Proposal base rule
 
@@ -100,6 +101,81 @@ Each receipt records `stale_mode` (the mode of the selected revision), `stale` (
 To find the stale receipts, use the existing reads. `inspect` gives `state.receipts`, the list of receipt references. Read each receipt with `receipt` and keep the receipts with `stale` `true`. There is no stale index. The scan reads each receipt once.
 
 The Host compares the invocation `date` with the activation interval. It reads no clock. An executor that sets `date` from its local clock uses only that clock. There is no clock synchronization policy.
+
+## Receipt provenance and ingest
+
+An operator traces each receipt to the executor that wrote it, its position in the local log of that executor and its exact inputs. An executor is a process that runs a pinned snapshot and writes receipts. Each receipt has these provenance fields:
+
+| Field | Meaning |
+|---|---|
+| `executor_id` | The executor that wrote the receipt. It is the `worker` value of the host context. A request cannot set it. |
+| `log_cursor` | The position of the receipt in the log of that executor: an integer from 1. |
+| `inputs_ref` | The input digest: the content reference of the canonical input bytes with the `application/json` media type. `InputDigest` computes it. |
+| `selection.snapshot_ref` | The pinned snapshot. |
+
+The state field `executors` holds one log for each executor ID. The log is the list of receipt references in cursor order, so the receipt at position n has `log_cursor` n. The Host makes the field when it writes the first receipt. A store without the field has empty logs.
+
+The Host is the executor for `invoke`, `replay` and `restate`. Each of these receipts takes the next cursor in the log of the context `worker`. These receipts are also in `state.receipts`.
+
+`ingest` records the local log of an executor that ran away from the Host. The host role is `worker`, and the executor ID is the context `worker`. `entries` is a nonempty list of log entries in log order. Each entry has these fields:
+
+| Field | Meaning |
+|---|---|
+| `cursor` | The local log cursor: an integer from 1 to 2^53-1. On a 32-bit platform, the cursor must also be in the range of an `int`. |
+| `snapshot_ref` | The pinned snapshot. It must be a snapshot in the store, in the trusted scope, for a function in the context `functions`. Else the result is `out_of_scope`, as for `resolve`. |
+| `date` | The invocation date, as an ISO date. |
+| `inputs_ref` | The input digest. |
+| `response` | The answer object of the executor. Its `bundle_ref` must equal the `bundle_ref` of the snapshot, or the result is `artifact_mismatch`. |
+| `stale_reason` | Optional: `expired`, `revoked` or an empty string. The default is an empty string. An entry has no `stale` field. The Host derives `stale` on the receipt, and an entry with `stale` is `invalid_request`. |
+| `inputs` | Optional: the raw inputs. Only the upload policy permits this field. |
+
+An `enable` event of the registry for this function and scope must name the pinned snapshot and have `from` at or before the entry date. Else the result is `out_of_scope` (stage `resolve`). The Host always keeps the answer of a known activation, because a user saw it. It does not refuse an entry because the stale reason of the executor differs from its own view. This rule also applies to a `fail_closed` snapshot.
+
+The Host computes its own view with the masks that `invoke` uses (see [Expiry and revocation](#expiry-and-revocation)):
+
+1. If an `enable` event of the snapshot is live at the date, the view is an empty string.
+2. Else, if the date is in the interval of an `enable` event of the snapshot, a mask removed it. The view is `revoked`.
+3. Else, the view is `expired`.
+
+An entry has no `executor_id` field, and an unknown field is `invalid_request`. Thus a request cannot name another executor. To ingest for a different executor, the embedding host installs a context with that `worker` value.
+
+The Host makes one receipt record for each entry. The record has two parts:
+
+- The executor claim: `mode` `ingest`, the provenance fields, a `selection` with `function`, `scope`, `date`, `snapshot_ref`, `bundle_ref` and `engine_build` from the snapshot, `response_ref`, `stale_mode` from the snapshot and `stale_reason`. `stale_reason` is the statement of the executor. The receipt also has `stale`, but `stale` is not part of the claim. The Host derives it from the claim: `stale` is `true` only if `stale_reason` is not empty.
+- The host fields: `host_stale_reason`, the view of the Host at ingest, and `host_checked_events`, the number of registry events that the Host examined. A later event can change the view of the Host, but not a stored receipt.
+
+The record has no `lifecycle_build`, so a new Host build makes the same claim from the same entry.
+
+Ingest is idempotent on the pair (executor ID, cursor). The Host reads the receipt in the log at that cursor and compares its executor claim with the claim of the new entry. The comparison ignores the host fields, so a later event does not make a re-ingest of the same log a conflict:
+
+1. If the cursor is in the log and the claims are equal, the entry is a duplicate. It adds no receipt, and the result names the stored receipt.
+2. If the cursor is in the log and the claims differ, the result is `ingest_conflict`. A different response, input digest, snapshot, date or stale reason is a different payload.
+3. If the cursor is the next cursor after the log, the Host appends the receipt.
+4. If the cursor is after the next cursor, the result is `ingest_gap`. The Host does not fill a gap.
+
+The Host examines the entries in the list order. Thus a reorder in the list is a gap, for example cursor 2 before cursor 1. A repeated cursor in one list is a duplicate. To continue after a gap, send the log again from the first cursor that is not in the store. A list can start before the end of the log, and the earlier entries are duplicates. A fault stops the full ingest, so a failed ingest publishes no part of its entries.
+
+The result is `executor_id`, `log_cursor` (the last cursor of the log), `added` (the number of new receipts) and `receipts` (the receipt reference of each entry, in the list order). A second ingest of the same log with a new `request_key` gives `added` 0 and the same `receipts`. It publishes a new root that has only the new request record. A retry with the same `request_key` gives the first result, as for each write. The stored request binds the context `actor`, `scope`, `runner_actor`, `worker` and `upload_inputs`. Thus the same `request_key` from a context with another `worker` or upload policy is `idempotency_conflict`. This rule applies to each write, also to `invoke`, `replay` and `restate`.
+
+The Host and an ingest share one log for each executor ID. If an ingest uses the executor ID of a Host worker at a cursor that the Host wrote, the result is `ingest_conflict`. Use a different executor ID for each executor.
+
+The raw inputs stay with the executor by default. The host context field `upload_inputs` is the upload policy. It is optional, and it must be a boolean. If it is not `true`, an entry with `inputs` is `upload_not_permitted`, and the Host stores only the digest. If it is `true`, the canonical bytes of `inputs` must have the digest `inputs_ref`, or the result is `input_mismatch`. The Host then stores the bytes at that reference. The receipt is the same with and without the upload. A duplicate entry with `inputs` also stores them, so an executor can upload inputs after the first ingest.
+
+To audit the ingested receipts, use `inspect` for `state.executors`, then read each receipt with `receipt`:
+
+- A receipt with `stale` `true` (a `stale_reason` that is not empty) is stale in the claim of the executor.
+- A receipt with a `host_stale_reason` that is not empty is stale in the view of the Host.
+- A receipt with `stale_reason` different from `host_stale_reason` is a mismatch.
+- A stale receipt with `stale_mode` `fail_closed` is an answer that `invoke` refuses. The Host keeps it to record what the user saw.
+
+These are the limits of ingest:
+
+- The Host does not run the rule again. An ingested receipt is the statement of the executor, bound to its executor ID and the pinned snapshot. A content reference is not a signature.
+- A mask can revoke an activation after the executor wrote its entry, and the executor did not know about it at that time. Thus a difference between `stale_reason` and `host_stale_reason` is not an error. It is a fact for an auditor.
+- An ingested receipt is not in `state.receipts`. It has no registry selection, so `replay` and `restate` give `artifact_unavailable`. Use `inspect` for `state.executors` and `receipt` to read each ingested receipt.
+- There is no network transport for ingest. The executor sends its log through the JSONL host or the local socket.
+
+The vectors in [conformance/ingest/](../src/cel-lifecycle/conformance/ingest/) state the expected results. Each vector writes a seed snapshot and its `enable` event to a new store, sends Host requests (a string in `entries` names an entry in the `entries` object of the vector) and checks the result, the number of stored objects, the executor logs and the stored raw inputs. The expected receipt references come from the record shape above. `ingest_test.go` runs each vector on a new Git store and a new in-memory store.
 
 ## Content references for a stage bundle
 

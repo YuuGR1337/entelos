@@ -31,7 +31,7 @@ The `go-lifecycle-core` check in `verify.py` does these steps:
 
 The Host tests in `host_test.go` start from a copy of the Git repository that the scenario made. The pins name the records of that scenario. `TestUnknownRecordFormatFailsClosed` plants receipts with an unknown, a missing and a malformed format. The `receipt`, `record` and `replay` operations must each give a structured diagnostic and publish no state. The stale mode tests check that `fail_closed` is the default, that an invalid `stale_mode` is refused, that a caller cannot select the mode, that `continue_stale` gives a stale receipt on revocation, and that a reader finds each stale receipt with `inspect` and `receipt`. `schema_test.go` checks that each schema file in `src/protocol/schema/` agrees with the Host table.
 
-`vectors_test.go` runs each storage port vector in `src/cel-lifecycle/conformance/storage/` on a new Git store and a new in-memory store.
+`vectors_test.go` runs each storage port vector in `src/cel-lifecycle/conformance/storage/` on a new Git store and a new in-memory store. `ingest_test.go` runs each ingest vector in `src/cel-lifecycle/conformance/ingest/` on both adapters. It also has the negative ingest tests.
 
 The `go test` step also runs the `protocol/` tests:
 
@@ -47,7 +47,7 @@ The `sidecar-protocol` check in `verify.py` builds `cmd/entelos-sidecar`. Then i
 entelos-sidecar --socket <path> --repo <store.git> --context <context.json> --runtime <cel-handoff> --work <dir> --schema src/protocol/schema
 ```
 
-- The host context comes from the `--context` file. A request cannot supply the actor, the roles or the scope.
+- The host context comes from the `--context` file. A request cannot supply the actor, the roles or the scope. The context fields are `actor`, `roles`, `scope`, `runner_actor`, `worker`, `functions` and the optional boolean `upload_inputs`, the ingest upload policy. See [CONTRACTS.md](../../docs/CONTRACTS.md#receipt-provenance-and-ingest).
 - The sidecar reads the schemas from `--schema` at start. If an operation schema does not agree with the Host read operations, the sidecar does not start.
 - The socket file has mode 0600. The umask is 0177 while the sidecar makes the socket, so the mode is 0600 from the start.
 - If the socket path exists, the sidecar removes it only if it is a stale socket: a socket file with no listener. If the path is another file type or a socket with a listener, the sidecar does not start.

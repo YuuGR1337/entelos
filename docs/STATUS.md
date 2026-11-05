@@ -106,6 +106,8 @@ Issue #78 adds the record format version. Each stored record has `format: "entel
 
 Issue #82 adds the fail-closed expiry and revocation mode. Expiry is a date at or after the `until` date of the loaded activation. Revocation is a later mask, usually a `suspend` event. By default, `invoke` then fails closed with `activation_expired` or `activation_revoked`. A proposal can declare `stale_mode` `continue_stale`, so that the reviewer approves the mode with the revision. Then the loaded activation answers, and the receipt has `stale` `true`. A reader finds the stale receipts with `inspect` and `receipt`. Scenario steps show both modes. The Host reads no clock; it compares the invocation date only.
 
+Issue #81 adds receipt provenance and idempotent `ingest` of an executor log. Raw inputs stay with the executor by default. There is no network transport for ingest.
+
 Issue #80 adds the [qualification runner contract](../src/lifecycle-core/RUNNER.md) to the Go core. CEL is the first runner, and a test-only fixture runner shows that runners plug in.
 
 Issue #84 adds the Go sidecar `entelos-sidecar`: wire protocol 1.0 on a Unix socket with mode 0600. It passes all session vectors through the socket (`sidecar-protocol`), and [examples/sidecar-client](../examples/sidecar-client/README.md) completes propose, qualify, decide, activate and invoke through the socket only (`sidecar-client`). There is no authentication beyond the file mode.

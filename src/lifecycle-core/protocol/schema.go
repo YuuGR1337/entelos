@@ -5,6 +5,7 @@ package protocol
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -138,6 +139,26 @@ func sameValue(a, b any) bool {
 	return err1 == nil && err2 == nil && string(x) == string(y)
 }
 
+// bigInt gives an integer value or a schema bound as an exact integer. A
+// float64 bound, as encoding/json decodes it, must have an integer value.
+// Any other value is not an integer, and the result is an error.
+func bigInt(v any) (*big.Int, error) {
+	var text string
+	switch n := v.(type) {
+	case lifecycle.Int:
+		text = n.Text
+	case int, int64:
+		text = fmt.Sprint(n)
+	case float64:
+		text = strconv.FormatFloat(n, 'f', -1, 64)
+	}
+	i, ok := new(big.Int).SetString(text, 10)
+	if !ok {
+		return nil, fmt.Errorf("schema bound is not an integer: %v", v)
+	}
+	return i, nil
+}
+
 func isInteger(v any) bool {
 	switch v.(type) {
 	case lifecycle.Int, int, int64:
@@ -199,6 +220,25 @@ func (s *Schemas) Validate(schema lifecycle.Object, value any, where string, roo
 		}
 		if p, has := schema["pattern"].(string); has && !s.patterns[p].MatchString(str) {
 			return invalid("%s does not match its pattern", where)
+		}
+	}
+	if isInteger(value) {
+		n, err := bigInt(value)
+		if err != nil {
+			return err
+		}
+		for _, k := range []string{"minimum", "maximum"} {
+			bound, has := schema[k]
+			if !has {
+				continue
+			}
+			limit, err := bigInt(bound)
+			if err != nil {
+				return err
+			}
+			if c := n.Cmp(limit); k == "minimum" && c < 0 || k == "maximum" && c > 0 {
+				return invalid("%s is out of range", where)
+			}
 		}
 	}
 	if list, ok := value.(lifecycle.Array); ok {

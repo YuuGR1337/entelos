@@ -191,3 +191,26 @@ func TestBodyCannotReplaceOperation(t *testing.T) {
 		}
 	}
 }
+
+// The validator applies minimum and maximum to each integer, also above
+// the range of int64, if the bound is a lifecycle.Int. A float64 bound is
+// exact only up to 2^53-1. A bound that is not an integer is a schema
+// error, not a zero bound.
+func TestIntegerBounds(t *testing.T) {
+	s := &Schemas{}
+	schema := lifecycle.Object{"type": "integer", "minimum": lifecycle.Int{Text: "1"}, "maximum": float64(9007199254740991)}
+	for text, valid := range map[string]bool{"0": false, "1": true, "9007199254740991": true, "9007199254740992": false, "99999999999999999999": false} {
+		err := s.Validate(schema, lifecycle.Int{Text: text}, "cursor", nil)
+		var bad *requestError
+		if (err == nil) != valid || err != nil && !errors.As(err, &bad) {
+			t.Errorf("%s: got %v", text, err)
+		}
+	}
+	for _, bound := range []any{"1", 1.5, true, nil} {
+		err := s.Validate(lifecycle.Object{"minimum": bound}, lifecycle.Int{Text: "5"}, "cursor", nil)
+		var bad *requestError
+		if err == nil || errors.As(err, &bad) {
+			t.Errorf("bound %#v: got %v, want a schema error", bound, err)
+		}
+	}
+}

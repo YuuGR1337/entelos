@@ -14,6 +14,7 @@ This file lists the changes for each snapshot tag. A tag is a stable snapshot to
 - `verify.py` has no parity stage. The `go-lifecycle-core` check runs the Go scenario, the storage port vectors and the Host tests.
 - Each stored record has the field `format: "entelos.record/1"` (#78). A read of a record without this field, or with an unknown major version, fails closed with `unsupported_record_format`. The new `record-format` storage vector tests this rule. Stores from v0.1.0 are not migrated. See [SUPPORT.md](docs/SUPPORT.md).
 - An expired or revoked activation fails closed by default (#82). The new diagnostics are `activation_expired` and `activation_revoked`. A proposal can declare `stale_mode` `continue_stale`. Then the loaded activation gives the answer, and the receipt has `stale` `true`. Each receipt records `stale_mode`, `stale` and `stale_reason`. See [CONTRACTS.md](docs/CONTRACTS.md#expiry-and-revocation).
+- Each receipt records its provenance (#81): `executor_id`, `log_cursor`, `inputs_ref` and `selection.snapshot_ref`. The new `ingest` operation records an executor log, idempotent on the executor ID and the cursor. It keeps each answer and records the Host stale view in `host_stale_reason`. See [CONTRACTS.md](docs/CONTRACTS.md#receipt-provenance-and-ingest).
 
 ## v0.1.0 (2026-11-04)
 
