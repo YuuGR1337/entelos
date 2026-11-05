@@ -7,7 +7,7 @@
   ".github/ISSUE_TEMPLATE/first-contact.yml": "958d366ce649fc89c820bdd0e4f5a1317be5462eb447ff7d787519290ef2844b",
   ".github/ISSUE_TEMPLATE/workflow.yml": "cdff1879bc4c2f7a08b21847578d0c2a9289291d74f7603b9b3611192a871f07",
   ".github/pull_request_template.md": "fd047414a302e7eec1e002e83aabdeb63a1da8f2c55beb56760f7478630fbeac",
-  ".github/workflows/ci.yml": "2896c4d439060b1929850b7468f56f5378b1160febf4c7463d5da952ba7c9176",
+  ".github/workflows/ci.yml": "f1a9c08a5374908870d544fd3b015a2e5011ddc78a5e59343e3bbdcc2554b7ca",
   ".github/workflows/claude-review.yml": "e3b4b21dd1e7778da8ce1a12b3ae5b4f1b51b1b3e7834d562fb0f83c90269c2c",
   ".github/workflows/pr-policy-rerun.yml": "e1b78b385f89117c85a80b78a83f48a4b4cf099256ebbc80d4564661260fc709",
   ".github/workflows/pr-policy.yml": "eb5c5abfbd73f6d0974b064333d46c6d8c6f804e70cb5e88ca6f568cbf0b523c",
