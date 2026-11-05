@@ -115,12 +115,9 @@ func (s *Server) Shutdown(listener *net.UnixListener) error {
 		conn.Close()
 	}
 	s.mu.Unlock()
-	addr := listener.Addr().String()
+	// Close removes the socket file before the wait. Shutdown does not remove
+	// the path again, because a new sidecar can bind it during the wait.
 	err := listener.Close()
 	s.wg.Wait()
-	// Close removes the socket file. Remove it here too, if it stays.
-	if rmErr := os.Remove(addr); rmErr != nil && !errors.Is(rmErr, fs.ErrNotExist) && err == nil {
-		err = rmErr
-	}
 	return err
 }

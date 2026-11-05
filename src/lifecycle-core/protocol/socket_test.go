@@ -210,3 +210,47 @@ func TestOneHostRequestAtATime(t *testing.T) {
 		}
 	}
 }
+
+// Shutdown does not remove a socket that a new sidecar binds while a Host
+// request is in flight.
+func TestShutdownKeepsReplacementSocket(t *testing.T) {
+	inTempDir(t)
+	h := gateHost{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	s, l, done := startServer(t, h)
+	conn, err := net.Dial("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.Write(frameOf(inspect)); err != nil {
+		t.Fatal(err)
+	}
+	<-h.entered
+	stopped := make(chan error, 1)
+	go func() { stopped <- s.Shutdown(l) }()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if _, err := os.Lstat(sock); os.IsNotExist(err) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("Shutdown does not close the listener")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	replacement, err := Listen(sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replacement.Close()
+	close(h.release)
+	if err := <-stopped; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+	if info, err := os.Lstat(sock); err != nil || info.Mode().Type() != fs.ModeSocket {
+		t.Fatalf("Shutdown removed the replacement socket: %v", err)
+	}
+}
