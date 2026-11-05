@@ -14,6 +14,14 @@
    "type": "object"
   },
   "result": {
+   "properties": {
+    "format": {
+     "const": "entelos.record/1"
+    }
+   },
+   "required": [
+    "format"
+   ],
    "type": "object"
   }
  },

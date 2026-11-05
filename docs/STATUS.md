@@ -102,6 +102,8 @@ On 2026-11-05, the maintainer accepted the [technology decision](decisions/0001-
 
 Issue #79 adds a storage port spec, 11 JSON storage vectors and an in-memory adapter. The Git adapter and the in-memory adapter pass all vectors. The Go tests run them in the `go-lifecycle-core` check of `verify.py`. The vectors do not show durability or performance.
 
+Issue #78 adds the record format version. Each stored record has `format: "entelos.record/1"`. `View.Get` reads only this major version. A record without a format or with an unknown major version fails closed with `unsupported_record_format`. The `record-format` storage vector and a Host test check this rule. The vector set now has 12 files. Stores from v0.1.0 are not migrated, and there is no migration tool.
+
 Issue #80 adds the [qualification runner contract](../src/lifecycle-core/RUNNER.md) to the Go core. CEL is the first runner, and a test-only fixture runner shows that runners plug in.
 
 Issue #84 adds the Go sidecar `entelos-sidecar`: wire protocol 1.0 on a Unix socket with mode 0600. It passes all session vectors through the socket (`sidecar-protocol`), and [examples/sidecar-client](../examples/sidecar-client/README.md) completes propose, qualify, decide, activate and invoke through the socket only (`sidecar-client`). There is no authentication beyond the file mode.

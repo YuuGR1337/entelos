@@ -134,5 +134,5 @@ The Go sidecar (#84) passes the vector files:
 ## Limits
 
 - The vectors do not run a rule. `describe` with an activation, `qualify`, `load`, `invoke`, `replay` and `restate` are checked only by their schemas. The [sidecar client](../../examples/sidecar-client/README.md) runs `qualify`, `describe`, `load` and `invoke` through the socket with the pinned runtime, but it is an example, not a vector.
-- Record objects inside a result (`report`, `receipt`, `state`) have the type `object` only. The record format version (#78) owns their schemas.
+- A record object inside a result (`record`, `receipt`, `report`) must have `format: "entelos.record/1"`. The schemas do not define the other fields of a record. The `state` object has the type `object` only.
 - The validator supports only the JSON Schema keywords that the files in `schema/` use.

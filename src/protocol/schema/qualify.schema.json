@@ -39,6 +39,14 @@
      "additionalProperties": false,
      "properties": {
       "report": {
+       "properties": {
+        "format": {
+         "const": "entelos.record/1"
+        }
+       },
+       "required": [
+        "format"
+       ],
        "type": "object"
       },
       "report_ref": {

@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-var vectorInvariants = []string{"atomic_publication", "idempotent_success", "immutable_content_identity",
+var vectorInvariants = []string{"atomic_publication", "idempotent_success", "immutable_content_identity", "known_record_format",
 	"no_partial_state_after_failure", "stable_historical_read", "stale_cas_rejection"}
 
 type vectorRun struct {
