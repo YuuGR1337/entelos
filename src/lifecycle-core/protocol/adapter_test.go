@@ -170,3 +170,24 @@ func TestLoadSchemasRefusesMismatch(t *testing.T) {
 		t.Fatal("an empty directory loaded")
 	}
 }
+
+// recordHost keeps the operation of each Host request.
+type recordHost struct{ ops *[]any }
+
+func (h recordHost) Handle(q any) (any, error) {
+	*h.ops = append(*h.ops, q.(lifecycle.Object)["op"])
+	return lifecycle.Object{"cursor": "", "state": lifecycle.Object{}}, nil
+}
+
+// A body key "op" does not change the operation that the Host gets. The
+// schemas reject the key now; this test also covers a schema that allows it.
+func TestBodyCannotReplaceOperation(t *testing.T) {
+	var ops []any
+	a := NewAdapter(recordHost{&ops}, loadTestSchemas(t))
+	a.Message(lifecycle.Object{"body": lifecycle.Object{"op": "activate"}, "operation": "inspect", "protocol": "1.0", "request_id": "stub"})
+	for _, op := range ops {
+		if op != "inspect" {
+			t.Fatalf("the Host got operation %v, want inspect", op)
+		}
+	}
+}

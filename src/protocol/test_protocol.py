@@ -201,7 +201,9 @@ def run_file(path,sidecar=None):
     doc=json.loads(path.read_text());errors=[];bound={}
     directory=Path(tempfile.mkdtemp(prefix=path.stem+'-',dir=WORK))
     if sidecar:
-        transport=Sidecar(sidecar[0],sidecar[1],directory,doc['context'])
+        # If the sidecar does not start, keep the directory with its log as evidence.
+        try:transport=Sidecar(sidecar[0],sidecar[1],directory,doc['context'])
+        except Exception:return len(doc['steps']),[path.name+': sidecar did not start\n'+traceback.format_exc()],str(directory)
         if transport.socket_mode()!=0o600:errors.append(path.name+': socket mode %o, expected 600'%transport.socket_mode())
     else:transport=Local(ra.Adapter(Host(GitStore(directory/'store.git'),NoRuntime(),doc['context'])))
     try:

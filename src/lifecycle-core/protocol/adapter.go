@@ -97,10 +97,13 @@ func (a *Adapter) Message(request lifecycle.Object) lifecycle.Object {
 		}
 		return internal(id)
 	}
-	q := lifecycle.Object{"op": op}
+	q := lifecycle.Object{}
 	for k, v := range request["body"].(lifecycle.Object) {
 		q[k] = v
 	}
+	// The checked operation controls the dispatch. A body key "op" cannot
+	// replace it.
+	q["op"] = op
 	result, err := a.handle(q)
 	var fault *lifecycle.Fault
 	switch {
