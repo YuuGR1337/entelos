@@ -317,8 +317,8 @@ func TestListenRefusesLockThatIsNotFile(t *testing.T) {
 	if err := os.Mkdir(sock+".lock", 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Listen(sock); err == nil {
-		t.Fatal("Listen used a directory as the lock file")
+	if _, err := Listen(sock); err == nil || !strings.Contains(err.Error(), sock+".lock") {
+		t.Fatalf("Listen used a directory as the lock file, or failed for another reason: %v", err)
 	}
 }
 
@@ -334,7 +334,8 @@ func TestListenSetsLockMode(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer l.Close()
-	if info, _ := os.Stat(sock + ".lock"); info.Mode().Perm() != 0o600 {
-		t.Fatalf("lock mode %v, want 0600", info.Mode().Perm())
+	info, err := os.Stat(sock + ".lock")
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("lock file: %v %v, want mode 0600", info, err)
 	}
 }
