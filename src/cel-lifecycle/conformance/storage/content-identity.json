@@ -25,7 +25,7 @@
        "note": "alpha",
        "n": 1
       },
-      "expect_ref": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6"
+      "expect_ref": "sha256:0d7cffa4c1e11c14d855216cb292eb7c9d8b4da370d663a47b123d8082830851"
      },
      {
       "put": "note",
@@ -33,15 +33,16 @@
        "note": "alpha",
        "n": 1
       },
-      "expect_ref": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6"
+      "expect_ref": "sha256:0d7cffa4c1e11c14d855216cb292eb7c9d8b4da370d663a47b123d8082830851"
      },
      {
-      "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+      "get": "sha256:0d7cffa4c1e11c14d855216cb292eb7c9d8b4da370d663a47b123d8082830851",
       "kind": "note",
       "expect": {
        "value": {
         "note": "alpha",
-        "n": 1
+        "n": 1,
+        "format": "entelos.record/1"
        }
       }
      },
@@ -85,17 +86,18 @@
    "op": "read",
    "actions": [
     {
-     "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+     "get": "sha256:0d7cffa4c1e11c14d855216cb292eb7c9d8b4da370d663a47b123d8082830851",
      "kind": "note",
      "expect": {
       "value": {
        "note": "alpha",
-       "n": 1
+       "n": 1,
+       "format": "entelos.record/1"
       }
      }
     },
     {
-     "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+     "get": "sha256:0d7cffa4c1e11c14d855216cb292eb7c9d8b4da370d663a47b123d8082830851",
      "kind": "other",
      "expect": {
       "error": "invalid_record"
@@ -174,7 +176,7 @@
        "note": "alpha",
        "n": 1
       },
-      "expect_ref": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6"
+      "expect_ref": "sha256:0d7cffa4c1e11c14d855216cb292eb7c9d8b4da370d663a47b123d8082830851"
      }
     ],
     "result": "again"
@@ -190,12 +192,13 @@
    "op": "read",
    "actions": [
     {
-     "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+     "get": "sha256:0d7cffa4c1e11c14d855216cb292eb7c9d8b4da370d663a47b123d8082830851",
      "kind": "note",
      "expect": {
       "value": {
        "note": "alpha",
-       "n": 1
+       "n": 1,
+       "format": "entelos.record/1"
       }
      }
     }

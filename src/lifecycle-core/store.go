@@ -40,6 +40,12 @@ type View struct {
 
 var refPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
+// RecordFormat is the format of each record that this core writes. The
+// number after the slash is the major version.
+const RecordFormat = "entelos.record/1"
+
+var formatPattern = regexp.MustCompile(`^entelos\.record/([1-9][0-9]{0,8})$`)
+
 func newView(source objectSource, cursor string, state Object, entries map[string]string) *View {
 	return &View{Cursor: cursor, State: state, Entries: entries, pending: map[string][]byte{}, source: source}
 }
@@ -52,8 +58,14 @@ func (v *View) PutRaw(mime string, raw []byte) string {
 	return ref
 }
 
-// Put stages a record of a kind.
-func (v *View) Put(kind string, value any) string { return v.PutRaw(Media(kind), Encode(value)) }
+// Put stages a record of a kind. If the value is an object, Put first sets
+// its format field to RecordFormat.
+func (v *View) Put(kind string, value any) string {
+	if record, ok := value.(Object); ok {
+		record["format"] = RecordFormat
+	}
+	return v.PutRaw(Media(kind), Encode(value))
+}
 
 // GetRaw reads verified bytes by exact content reference. An empty mime
 // skips the media type check.
@@ -104,7 +116,30 @@ func (v *View) Get(ref any, kind string) (Object, error) {
 	if !ok {
 		return nil, NewFault("invalid_record", "record must be an object", "store")
 	}
+	if err := checkFormat(m); err != nil {
+		return nil, err
+	}
 	return m, nil
+}
+
+// checkFormat stops a read of a record that this core cannot read. A record
+// without a format, or with a different major version, gives
+// unsupported_record_format. A format value of a different shape gives
+// invalid_record.
+func checkFormat(record Object) error {
+	value, has := record["format"]
+	if !has {
+		return NewFault("unsupported_record_format", "record has no format field; this core reads only "+RecordFormat, "store")
+	}
+	s, ok := value.(string)
+	match := formatPattern.FindStringSubmatch(s)
+	if !ok || match == nil {
+		return NewFault("invalid_record", "record format is malformed", "store")
+	}
+	if s != RecordFormat {
+		return NewFault("unsupported_record_format", "record format major version "+match[1]+" is unknown; this core reads only "+RecordFormat, "store")
+	}
+	return nil
 }
 
 // cursorAt gives the cursor to read. nil is the current root.

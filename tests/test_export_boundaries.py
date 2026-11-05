@@ -12,7 +12,7 @@ import unittest
 ROOT=Path(os.environ.get('DECISION_EXPORT_SOURCE',Path(__file__).resolve().parents[1])).resolve()
 os.environ['LIFECYCLE_CLIENT_SOURCE']=str(ROOT/'src/lifecycle-core/client')
 sys.path.insert(0,str(ROOT/'examples/ci-trigger'))
-from support import Fault,encode,content_ref,envelope,fixture,root
+from support import Fault,encode,content_ref,envelope,fixture,media,record,root
 from adapter import Ingress,project,link,verify_link
 WORK=Path(os.environ['EXPORT_TEST_WORK']);WORK.mkdir(parents=True,exist_ok=True)
 # LIFECYCLE_HOST names the Go JSONL host cmd/lifecycle-core. The ordinary baseline of ci-trigger runs under the same host.
@@ -43,6 +43,15 @@ class ExportBoundaries(unittest.TestCase):
   audit=link(raw,ingress,invocation,self.work/'audit');audit['audit']['raw_ref']='sha256:../../unapproved'
   with self.assertRaises(Fault) as caught:verify_link(audit,self.work/'audit',ingress)
   self.assertEqual(caught.exception.code,'invalid_reference')
+
+ def test_evidence_reader_checks_the_record_format(self):
+  # The client evidence reader uses the record format rule of the Go View.Get.
+  def store(value):return {'objects':{'sha256:'+'3'*64:(media('receipt'),encode(value))}}
+  self.assertEqual(record(store({'format':'entelos.record/1','mode':'invoke'}),'sha256:'+'3'*64,'receipt')['mode'],'invoke')
+  for value,code in [({'format':'entelos.record/2'},'unsupported_record_format'),({'mode':'invoke'},'unsupported_record_format'),
+                     ({'format':'entelos.record/01'},'invalid_record'),({'format':1},'invalid_record'),([1],'invalid_record')]:
+   with self.assertRaises(Fault) as caught:record(store(value),'sha256:'+'3'*64,'receipt')
+   self.assertEqual((caught.exception.code,caught.exception.stage),(code,'client'),value)
 
 if __name__=='__main__':
  class Results(unittest.TextTestResult):

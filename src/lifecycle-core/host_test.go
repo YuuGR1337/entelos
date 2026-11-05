@@ -421,3 +421,66 @@ func TestHostOnTheMemoryStoreGivesTheGitAnswers(t *testing.T) {
 		t.Fatal("the memory store shares state with the Git view")
 	}
 }
+
+// A record of an unknown major version, a record without a format and a
+// record with a malformed format each stop the Host read with a structured
+// diagnostic. The failed replay publishes no state.
+func TestUnknownRecordFormatFailsClosed(t *testing.T) {
+	f := newFixture(t)
+	view, _ := f.store.Read(nil)
+	receipt, err := view.Get(f.pin("old_receipt"), "receipt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt["format"] != RecordFormat {
+		t.Fatalf("stored receipt format %v", receipt["format"])
+	}
+	cases := []struct {
+		name   string
+		format any
+		want   Object
+	}{
+		{"unknown-major", "entelos.record/2", Object{"code": "unsupported_record_format", "stage": "store"}},
+		{"missing", nil, Object{"code": "unsupported_record_format", "stage": "store"}},
+		{"malformed", "entelos.record/one", Object{"code": "invalid_record", "stage": "store"}},
+		{"not-a-string", Int{"1"}, Object{"code": "invalid_record", "stage": "store"}},
+	}
+	for _, c := range cases {
+		planted := copyObject(receipt)
+		delete(planted, "format")
+		if c.format != nil {
+			planted["format"] = c.format
+		}
+		var ref string
+		if _, err := f.store.Transact(f.root(), "plant-"+c.name, Object{"op": "test-import", "case": c.name}, func(v *View) (any, error) {
+			// PutRaw keeps the exact bytes. Put would set the current format.
+			ref = v.PutRaw(Media("receipt"), Encode(planted))
+			v.State["receipts"] = append(v.State["receipts"].(Array), ref)
+			return Object{"receipt_ref": ref}, nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		before := f.root()
+		// The reviewer context also has the reader role.
+		reader := f.host("reviewer", nil)
+		for _, q := range []Object{
+			{"op": "receipt", "receipt_ref": ref},
+			{"op": "record", "ref": ref, "kind": "receipt"},
+			f.request("replay", Object{"receipt_ref": ref, "reason": "format test " + c.name}),
+		} {
+			result, err := reader.Handle(q)
+			fault, ok := err.(*Fault)
+			if !ok {
+				t.Fatalf("%s %v: got %v %v, want a fault", c.name, q["op"], result, err)
+			}
+			got := fault.Record()["diagnostic"].(Object)
+			delete(got, "message")
+			if !equal(got, c.want) {
+				t.Fatalf("%s %v: diagnostic %v, want %v", c.name, q["op"], got, c.want)
+			}
+		}
+		if f.root() != before {
+			t.Fatalf("%s: a failed read published state", c.name)
+		}
+	}
+}

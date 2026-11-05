@@ -46,7 +46,7 @@
       "note": "beta",
       "n": 2
      },
-     "expect_ref": "sha256:34ace7c87146a15a553172878f3ee94ed9d09597b285768b69ced8d29117a1a4"
+     "expect_ref": "sha256:cc5b3d23ddab1c472818a5f487704bea71f8be0558cafb6cfcba30c6eb9d2a0c"
     },
     {
      "set": [
@@ -65,7 +65,7 @@
    "cursor": "$c1",
    "actions": [
     {
-     "get": "sha256:34ace7c87146a15a553172878f3ee94ed9d09597b285768b69ced8d29117a1a4",
+     "get": "sha256:cc5b3d23ddab1c472818a5f487704bea71f8be0558cafb6cfcba30c6eb9d2a0c",
      "kind": "note",
      "expect": {
       "error": "artifact_unavailable"

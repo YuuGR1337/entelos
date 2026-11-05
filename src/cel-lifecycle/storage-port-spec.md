@@ -14,6 +14,7 @@ The vectors are language-neutral. A harness in a different language can run the 
 - **Canonical JSON**: UTF-8 JSON with sorted object keys, no insignificant whitespace, non-ASCII characters not escaped, no non-finite numbers and one final newline (`\n`). Duplicate object keys are not permitted.
 - **Media type of a kind**: `application/vnd.cel-lifecycle.<kind>+json`.
 - **Content reference**: `sha256:` and the lowercase hex SHA-256 digest of the envelope. The envelope is the media type bytes, one NUL byte and the content bytes.
+- **Record format**: the string in the `format` field of a record object. The current format is `entelos.record/1`. A format has the shape `entelos.record/<major>`, where `<major>` is a decimal integer from 1 to 999999999 without a leading zero.
 - **Payload reference**: the content reference of the canonical JSON payload with the media type of the kind `request`.
 - **Fault**: an error with a stable `code`. Adapters return faults by code. The message text is not part of the contract.
 
@@ -33,9 +34,9 @@ The vectors are language-neutral. A harness in a different language can run the 
 A view has these operations:
 
 - `put_raw(mime, raw)`: record the bytes as pending content in this view. Return the content reference. Pending content is visible only in this view.
-- `put(kind, value)`: `put_raw` with the media type of the kind and the canonical JSON of the value.
-- `get_raw(ref, mime)`: return the content bytes. The `mime` input is optional.
-- `get(ref, kind)`: `get_raw` with the media type of the kind. Decode the bytes as JSON. The value must be a JSON object.
+- `put(kind, value)`: if the value is a JSON object, set its `format` field to `entelos.record/1`. Then do `put_raw` with the media type of the kind and the canonical JSON of the value.
+- `get_raw(ref, mime)`: return the content bytes. The `mime` input is optional. `get_raw` does not decode the bytes, so it does not check a record format.
+- `get(ref, kind)`: `get_raw` with the media type of the kind. Decode the bytes as JSON. The value must be a JSON object with the record format `entelos.record/1`.
 
 `get_raw` and `get` look first in the pending content of the view, then in the content of the view cursor. They fail with these codes:
 
@@ -44,7 +45,8 @@ A view has these operations:
 | `invalid_reference` | The reference is not `sha256:` and 64 lowercase hex digits. |
 | `artifact_unavailable` | The view and its cursor do not have the content. |
 | `artifact_mismatch` | The stored bytes do not have the given reference. |
-| `invalid_record` | The media type is not the requested type, the JSON is not valid, or `get` found a value that is not an object. |
+| `invalid_record` | The media type is not the requested type, the JSON is not valid, `get` found a value that is not an object, or the `format` value of the object does not have the record format shape. |
+| `unsupported_record_format` | `get` found an object without a `format` field, or with a record format of a different major version. The read fails closed. |
 
 ### `transact(expected, key, payload, apply)`
 
@@ -79,12 +81,12 @@ Step 3 occurs before step 4. Thus a retry with an old cursor still gets its orig
 | `idempotency_conflict` | `transact` | The key has a record for a different payload. |
 | `stale_revision` | `transact` | The expected cursor is not current, or a different writer published before the final compare-and-swap. |
 | `unknown_cursor` | `read` | The cursor is not in accepted history. |
-| `invalid_reference`, `artifact_unavailable`, `artifact_mismatch`, `invalid_record` | view reads | See the table in the read view section. |
+| `invalid_reference`, `artifact_unavailable`, `artifact_mismatch`, `invalid_record`, `unsupported_record_format` | view reads | See the table in the read view section. |
 | `invalid_store`, `store_error` | all | The adapter or its storage failed. The vectors do not cause these codes or `artifact_mismatch`. |
 
 ## Invariants
 
-Each vector names the invariants that it tests. The harness makes sure that the vector set tests all six.
+Each vector names the invariants that it tests. The harness makes sure that the vector set tests all seven.
 
 | Invariant | Statement |
 |---|---|
@@ -94,6 +96,7 @@ Each vector names the invariants that it tests. The harness makes sure that the 
 | `stable_historical_read` | A read at a cursor always returns the same state and content. Later publications do not change it. |
 | `no_partial_state_after_failure` | A failed `transact` adds no state, no request record and no content that a read can get. The key stays available. |
 | `immutable_content_identity` | A content reference identifies exact bytes and one media type. Equal content gives an equal reference in all transactions. |
+| `known_record_format` | `put` writes the current record format. `get` returns a record only if it has the current major version. Else `get` fails closed and gives no value. |
 
 An adapter can keep content that no revision refers to after a failure, for example Git objects. A read must not return that content.
 

@@ -46,6 +46,14 @@
        "type": "object"
       },
       "receipt": {
+       "properties": {
+        "format": {
+         "const": "entelos.record/1"
+        }
+       },
+       "required": [
+        "format"
+       ],
        "type": "object"
       },
       "receipt_ref": {

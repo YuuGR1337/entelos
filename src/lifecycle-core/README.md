@@ -5,7 +5,7 @@ This module is the lifecycle core. It is the only lifecycle Host. The specs, the
 ## Contents
 
 - `host.go`: the Host: the operations, roles, faults and records.
-- `store.go`: the storage port (`Read`, `Transact`, `History`) and the read view.
+- `store.go`: the storage port (`Read`, `Transact`, `History`) and the read view. `View.Put` writes the record format `entelos.record/1`. `View.Get` is the decode path of each record read, and it fails closed on an unknown record format.
 - `gitstore.go`: the local Git adapter. It publishes state only through a compare-and-swap of `refs/lifecycle/state`.
 - `memstore.go`: an in-memory adapter with the same publication contract. It is not durable.
 - `canon.go`: the record codec. Content references depend on its bytes.
@@ -29,7 +29,7 @@ The `go-lifecycle-core` check in `verify.py` does these steps:
 
 `scenario_test.go` runs the neutral lifecycle scenario on a new Git store, with the pinned CEL executable. It compares each answer, replay and restatement with the `expected` field of `src/cel-lifecycle/fixtures/lifecycle-scenario.json`. `LIFECYCLE_CEL_BINARY` names the CEL executable and `LIFECYCLE_CEL_BUNDLE` names the prepared record bundle. If these are not set, the scenario and the Host tests skip. `verify.py` also sets `LIFECYCLE_REQUIRE_SCENARIO`, so that a skip is a failure. `LIFECYCLE_SCENARIO_RESULTS` names a file for the checks, the pins and the trace of the scenario.
 
-The Host tests in `host_test.go` start from a copy of the Git repository that the scenario made. The pins name the records of that scenario. `schema_test.go` checks that each schema file in `src/protocol/schema/` agrees with the Host table.
+The Host tests in `host_test.go` start from a copy of the Git repository that the scenario made. The pins name the records of that scenario. `TestUnknownRecordFormatFailsClosed` plants receipts with an unknown, a missing and a malformed format. The `receipt`, `record` and `replay` operations must each give a structured diagnostic and publish no state. `schema_test.go` checks that each schema file in `src/protocol/schema/` agrees with the Host table.
 
 `vectors_test.go` runs each storage port vector in `src/cel-lifecycle/conformance/storage/` on a new Git store and a new in-memory store.
 

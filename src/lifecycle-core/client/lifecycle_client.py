@@ -9,9 +9,12 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 
 ROOT_REF = 'refs/lifecycle/state'
+# The record format that the Go core writes. See RecordFormat in store.go.
+RECORD_FORMAT = 'entelos.record/1'
 # The operations that publish no state. They are the Reads of host.go.
 READS = {'describe', 'resolve', 'inspect', 'record', 'receipt'}
 FILENAMES = {'manifest': 'manifest.json', 'environment': 'env.json', 'source': 'rule.cel', 'fixed': 'fixed.json'}
@@ -93,11 +96,21 @@ def read_store(repo):
 
 
 def record(store, ref, kind):
-    """Give the decoded record of kind from a read_store result."""
+    """Give the decoded record of kind from a read_store result. Use the record format rule of View.Get in store.go."""
     mime, raw = store['objects'][ref]
     if mime != media(kind):
         raise Fault('invalid_record', 'unexpected media type', 'client')
-    return decode(raw)
+    value = decode(raw)
+    if not isinstance(value, dict):
+        raise Fault('invalid_record', 'record must be an object', 'client')
+    if 'format' not in value:
+        raise Fault('unsupported_record_format', 'record has no format field; this client reads only ' + RECORD_FORMAT, 'client')
+    match = re.fullmatch(r'entelos\.record/([1-9][0-9]{0,8})', value['format']) if isinstance(value['format'], str) else None
+    if match is None:
+        raise Fault('invalid_record', 'record format is malformed', 'client')
+    if value['format'] != RECORD_FORMAT:
+        raise Fault('unsupported_record_format', 'record format major version ' + match.group(1) + ' is unknown', 'client')
+    return value
 
 
 def handle(host, repo, context, runtime, work, request):

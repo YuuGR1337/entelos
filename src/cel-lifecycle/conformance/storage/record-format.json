@@ -1,0 +1,201 @@
+{
+ "format": "storage-port-vector/v1",
+ "id": "record-format",
+ "description": "put sets the format field of an object record. get returns only a record of the known format. A record of an unknown major version or without a format fails closed. get_raw does not decode, so it does not check the format.",
+ "invariants": [
+  "known_record_format"
+ ],
+ "steps": [
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "key-1",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 1
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [
+     {
+      "put_raw": "application/vnd.cel-lifecycle.note+json",
+      "text": "{\"format\":\"entelos.record/1\",\"note\":\"current\"}\n",
+      "expect_ref": "sha256:ea5bf528d908ddf745551dd74755d4bfdff280791af30a2d181ce936bbdfc29c"
+     },
+     {
+      "put_raw": "application/vnd.cel-lifecycle.note+json",
+      "text": "{\"format\":\"entelos.record/2\",\"note\":\"future\"}\n",
+      "expect_ref": "sha256:fd5f88f866ce62aa6e62fc6eca592a5b262e578646fbf939eb5f865ccd4eafc2"
+     },
+     {
+      "put_raw": "application/vnd.cel-lifecycle.note+json",
+      "text": "{\"note\":\"v0.1.0\"}\n",
+      "expect_ref": "sha256:209c6c40b3a47b0a2f25220917169779352594c4a4ebf9e07459c0e61b0cbf72"
+     },
+     {
+      "put_raw": "application/vnd.cel-lifecycle.note+json",
+      "text": "{\"format\":1,\"note\":\"malformed\"}\n",
+      "expect_ref": "sha256:dd0c254f90b9ac847e1ad41681568620a128f0670245e1c83c32fb70491958b1"
+     },
+     {
+      "put_raw": "application/vnd.cel-lifecycle.note+json",
+      "text": "{\"format\":\"entelos.record/x\",\"note\":\"malformed\"}\n",
+      "expect_ref": "sha256:6870213ac7bd48683f492858517fc744ecc014a2ae7f57a0ee65cdf139710bc5"
+     },
+     {
+      "put_raw": "application/vnd.cel-lifecycle.note+json",
+      "text": "{\"format\":\"entelos.record/01\",\"note\":\"malformed\"}\n",
+      "expect_ref": "sha256:e967f92fcaaee8129e2e51ae103b2895aea75aaa2c8f8ff30e3dd94d6a80be1f"
+     },
+     {
+      "put_raw": "application/vnd.cel-lifecycle.note+json",
+      "text": "{\"format\":\"other.record/1\",\"note\":\"malformed\"}\n",
+      "expect_ref": "sha256:8f94e578a6dc2b9ce0af467214e5e77077a8eb0818cc77c291e0331a795eade5"
+     },
+     {
+      "put": "note",
+      "value": {
+       "note": "current"
+      },
+      "expect_ref": "sha256:ea5bf528d908ddf745551dd74755d4bfdff280791af30a2d181ce936bbdfc29c"
+     },
+     {
+      "get": "sha256:ea5bf528d908ddf745551dd74755d4bfdff280791af30a2d181ce936bbdfc29c",
+      "kind": "note",
+      "expect": {
+       "value": {
+        "format": "entelos.record/1",
+        "note": "current"
+       }
+      }
+     },
+     {
+      "get": "sha256:fd5f88f866ce62aa6e62fc6eca592a5b262e578646fbf939eb5f865ccd4eafc2",
+      "kind": "note",
+      "expect": {
+       "error": "unsupported_record_format"
+      }
+     },
+     {
+      "get": "sha256:209c6c40b3a47b0a2f25220917169779352594c4a4ebf9e07459c0e61b0cbf72",
+      "kind": "note",
+      "expect": {
+       "error": "unsupported_record_format"
+      }
+     },
+     {
+      "get": "sha256:dd0c254f90b9ac847e1ad41681568620a128f0670245e1c83c32fb70491958b1",
+      "kind": "note",
+      "expect": {
+       "error": "invalid_record"
+      }
+     },
+     {
+      "get": "sha256:6870213ac7bd48683f492858517fc744ecc014a2ae7f57a0ee65cdf139710bc5",
+      "kind": "note",
+      "expect": {
+       "error": "invalid_record"
+      }
+     },
+     {
+      "get": "sha256:e967f92fcaaee8129e2e51ae103b2895aea75aaa2c8f8ff30e3dd94d6a80be1f",
+      "kind": "note",
+      "expect": {
+       "error": "invalid_record"
+      }
+     },
+     {
+      "get": "sha256:8f94e578a6dc2b9ce0af467214e5e77077a8eb0818cc77c291e0331a795eade5",
+      "kind": "note",
+      "expect": {
+       "error": "invalid_record"
+      }
+     },
+     {
+      "get_raw": "sha256:fd5f88f866ce62aa6e62fc6eca592a5b262e578646fbf939eb5f865ccd4eafc2",
+      "mime": "application/vnd.cel-lifecycle.note+json",
+      "expect": {
+       "text": "{\"format\":\"entelos.record/2\",\"note\":\"future\"}\n"
+      }
+     }
+    ],
+    "result": "stored"
+   },
+   "expect": {
+    "reused": false,
+    "result": "stored",
+    "apply_calls": 1,
+    "bind": "c1"
+   }
+  },
+  {
+   "op": "read",
+   "actions": [
+    {
+     "get": "sha256:ea5bf528d908ddf745551dd74755d4bfdff280791af30a2d181ce936bbdfc29c",
+     "kind": "note",
+     "expect": {
+      "value": {
+       "format": "entelos.record/1",
+       "note": "current"
+      }
+     }
+    },
+    {
+     "get": "sha256:fd5f88f866ce62aa6e62fc6eca592a5b262e578646fbf939eb5f865ccd4eafc2",
+     "kind": "note",
+     "expect": {
+      "error": "unsupported_record_format"
+     }
+    },
+    {
+     "get": "sha256:209c6c40b3a47b0a2f25220917169779352594c4a4ebf9e07459c0e61b0cbf72",
+     "kind": "note",
+     "expect": {
+      "error": "unsupported_record_format"
+     }
+    },
+    {
+     "get": "sha256:dd0c254f90b9ac847e1ad41681568620a128f0670245e1c83c32fb70491958b1",
+     "kind": "note",
+     "expect": {
+      "error": "invalid_record"
+     }
+    },
+    {
+     "get": "sha256:6870213ac7bd48683f492858517fc744ecc014a2ae7f57a0ee65cdf139710bc5",
+     "kind": "note",
+     "expect": {
+      "error": "invalid_record"
+     }
+    },
+    {
+     "get": "sha256:e967f92fcaaee8129e2e51ae103b2895aea75aaa2c8f8ff30e3dd94d6a80be1f",
+     "kind": "note",
+     "expect": {
+      "error": "invalid_record"
+     }
+    },
+    {
+     "get": "sha256:8f94e578a6dc2b9ce0af467214e5e77077a8eb0818cc77c291e0331a795eade5",
+     "kind": "note",
+     "expect": {
+      "error": "invalid_record"
+     }
+    },
+    {
+     "get_raw": "sha256:fd5f88f866ce62aa6e62fc6eca592a5b262e578646fbf939eb5f865ccd4eafc2",
+     "mime": "application/vnd.cel-lifecycle.note+json",
+     "expect": {
+      "text": "{\"format\":\"entelos.record/2\",\"note\":\"future\"}\n"
+     }
+    }
+   ],
+   "expect": {
+    "cursor": "$c1"
+   }
+  }
+ ]
+}
