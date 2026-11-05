@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""A caller needs only discovery, ordinary inputs, and a retry key, not CEL/Git data."""
+"""A caller needs only discovery, ordinary inputs and a retry key, not CEL or Git data.
+
+The caller sends describe, then invoke, to the Go JSONL host cmd/lifecycle-core.
+"""
 import argparse
-from pathlib import Path
-import subprocess
 import sys
-from git_store import encode,decode
+from lifecycle_client import encode,decode,handle
 
 p=argparse.ArgumentParser(description=__doc__)
+p.add_argument('--host',required=True,help='Go lifecycle-core executable')
 p.add_argument('--repo',required=True);p.add_argument('--context',required=True)
 p.add_argument('--runtime',required=True);p.add_argument('--work',required=True)
 p.add_argument('--key',required=True);p.add_argument('--function',default='record.visible')
 p.add_argument('--date',default='2026-11-15')
 p.add_argument('--inputs',default='{"state":"reviewed","archived":false}')
 a=p.parse_args()
-command=[sys.executable,'-B',str(Path(__file__).with_name('cli.py')),'--repo',a.repo,'--context',a.context,'--runtime',a.runtime,'--work',a.work]
-def call(request):return decode(subprocess.check_output(command,input=encode(request)))
+def call(request):return handle(a.host,a.repo,a.context,a.runtime,a.work,request)[0]
 described=call({'op':'describe','function':a.function,'date':a.date})
 if described['status']!='ok':print(encode(described).decode(),end='');raise SystemExit(1)
 descriptor=described['data']

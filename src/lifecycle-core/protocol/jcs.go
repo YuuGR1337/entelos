@@ -1,7 +1,6 @@
 // Package protocol serves the versioned wire protocol of src/protocol/PROTOCOL.md
-// in front of a lifecycle Host. It is the Go form of
-// src/protocol/reference_adapter.py. The sidecar command puts it on a Unix
-// domain socket.
+// in front of a lifecycle Host. The sidecar command puts it on a Unix domain
+// socket.
 package protocol
 
 import (

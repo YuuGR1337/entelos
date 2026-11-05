@@ -1,49 +1,15 @@
 #!/usr/bin/env python3
-"""Reproduce the scoped neutral correction/replay loop through the JSONL CLI."""
-import argparse
-import copy
-import json
-import os
-from pathlib import Path
-import subprocess
-import sys
-from git_store import encode,decode,envelope,content_ref
-from cel_runtime import MIMES
+"""Run the record.visible correction and replay loop through the Go JSONL host cmd/lifecycle-core.
 
-class Driver:
-    def __init__(self,root,work,binary,scenario):
-        self.root,self.work,self.binary,self.fixture=root,work,binary,scenario
-        self.work.mkdir(parents=True,exist_ok=True)
-        self.repo=work/'state.git';self.trace=[];self.checks=[];self.counter=0
-        self.contexts={}
-        roles={'reviewer':['reviewer','reader'],'author':['author'],'runner':['runner'],'caller':['caller'],
-               'worker':['worker'],'reader':['reader'],'observer':['observer'],'maintainer':['maintainer'],
-               'other-runner':['runner'],'other-maintainer':['maintainer']}
-        for name,permissions in roles.items():
-            context={'actor':'fixture-runner' if name=='runner' else name,'roles':permissions,'scope':scenario['scope'],
-                     'runner_actor':'fixture-runner','worker':'local-worker','functions':[scenario['function']]}
-            path=work/(name+'.json');path.write_bytes(encode(context));self.contexts[name]=path
-    def cursor(self):
-        p=subprocess.run(['git','--git-dir='+str(self.repo),'rev-parse','--verify','refs/lifecycle/state'],capture_output=True,text=True)
-        return p.stdout.strip() if p.returncode==0 else ''
-    def call(self,actor,op,name=None,expected='ok',**values):
-        from lifecycle import READS
-        self.counter+=1
-        q={'op':op}|values
-        if op not in READS:
-            q.setdefault('expected_revision',self.cursor());q.setdefault('request_key',name or op+'-'+str(self.counter))
-        p=subprocess.run([sys.executable,'-B',str(self.root/'cli.py'),'--repo',str(self.repo),
-                          '--context',str(self.contexts[actor]),'--runtime',str(self.binary),'--work',str(self.work)],
-                         input=encode(q),capture_output=True,env=os.environ)
-        try:r=decode(p.stdout)
-        except Exception:r={'status':'process_error','stdout':p.stdout.decode(errors='replace'),'stderr':p.stderr.decode(errors='replace')}
-        self.trace.append({'name':name or op,'actor':actor,'request':q,'process_exit':p.returncode,'response':r,'expected_status':expected})
-        if r['status']!=expected:raise AssertionError(f'{name or op}: {r} expected {expected}; stderr={p.stderr!r}')
-        return r.get('data',r)
-    def check(self,name,question,passed,actual):
-        self.checks.append({'name':name,'question':question,'passed':bool(passed),'actual':actual})
-        if not passed:raise AssertionError(name)
-    def result(self,value):return value['result']
+The expected answers come from the fixture. Each step is one new Go host process.
+"""
+import argparse
+import json
+from pathlib import Path
+import lifecycle_client
+from lifecycle_client import encode,decode,envelope,content_ref,MIMES
+
+class Driver(lifecycle_client.Driver):
     def bundle(self,example,allowed):
         data={key:(example/filename).read_bytes() for key,filename in {'manifest':'manifest.json','environment':'env.json','source':'rule.cel','fixed':'fixed.json'}.items()}
         data['fixed']=encode({'allowed_state':allowed})
@@ -162,8 +128,9 @@ def demonstrate(d,example):
     return {'initial_snapshot':snap1,'future_snapshot':snap2,'correction_snapshot':snap3,'future_event':future,'correction_event':enabled,'decision':dec3,'old_receipt':before['receipt_ref'],'new_receipt':restated['receipt_ref'],'historical_cursor':historical,'correction_cursor':correction_cursor}
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--work',type=Path,required=True);p.add_argument('--runtime',type=Path,required=True);p.add_argument('--bundle',type=Path,required=True);p.add_argument('--fixture',type=Path,required=True);a=p.parse_args()
-    a.work.mkdir(parents=True,exist_ok=True);driver=Driver(Path(__file__).resolve().parent,a.work,a.runtime,decode(a.fixture.read_bytes()))
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--work',type=Path,required=True);p.add_argument('--runtime',type=Path,required=True);p.add_argument('--bundle',type=Path,required=True);p.add_argument('--fixture',type=Path,required=True)
+    p.add_argument('--host',type=Path,required=True,help='Go lifecycle-core executable');a=p.parse_args()
+    a.work.mkdir(parents=True,exist_ok=True);driver=Driver(a.work,a.runtime,decode(a.fixture.read_bytes()),a.host.resolve())
     error=None;pins={}
     try:pins=demonstrate(driver,a.bundle)
     except Exception as e:error=repr(e)

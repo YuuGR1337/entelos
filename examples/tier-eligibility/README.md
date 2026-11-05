@@ -2,7 +2,7 @@
 
 This example is the third neutral consumer of `src/`. It answers one invented question: may a customer use the bulk export feature on a given date? An engineer who did not write the reference wrote it from the docs, for [issue #12](https://github.com/mohanraj00/entelos/issues/12) (milestone M3). [FINDINGS.md](FINDINGS.md) lists each place where the docs were not sufficient.
 
-The example imports `src/cel-lifecycle` and calls `src/cel-handoff/tools/prepare.py`. It does not copy them. It changes no file in `src/`.
+The example imports the Python callers in `src/lifecycle-core/client` and calls `src/cel-handoff/tools/prepare.py`. It does not copy them. It changes no file in `src/`.
 
 ## The rule
 
@@ -39,7 +39,8 @@ The amendment opens the feature to silver customers. It also allows trial accoun
 
 ```sh
 python3 -B examples/tier-eligibility/run.py --work "$(mktemp -d)/tier" \
-  --cel-binary "$TASK_WORK/bin/cel-handoff" --author-binary "$TASK_WORK/bin/cel-expr"
+  --cel-binary "$TASK_WORK/bin/cel-handoff" --author-binary "$TASK_WORK/bin/cel-expr" \
+  --host "$TASK_WORK/bin/lifecycle-core"
 ```
 
 The `--work` directory must not exist. The example writes the bundle, the Git store, `results.json` and `commands.json` to it. The last line gives `"status": "passed"` or `"status": "failed"`.
@@ -49,8 +50,8 @@ The `--work` directory must not exist. The example writes the bundle, the Git st
 1. It writes the author bundle with the unchanged `prepare.py` and [fixtures/callable.json](fixtures/callable.json).
 2. It runs the pinned upstream `cel-expr eval` on the rule and the stated `ok` cases.
 3. It runs the host `describe` and `check` commands. The cases include three refusals. A call with another bundle reference gives `artifact_mismatch`.
-4. It runs the dated lifecycle from [fixtures/lifecycle.json](fixtures/lifecycle.json) through the unchanged JSONL boundary `src/cel-lifecycle/cli.py`. `run.py` subclasses `Driver` from `src/cel-lifecycle/scenario.py`.
-5. It calls the new function with the unchanged `src/cel-lifecycle/client.py`.
+4. It runs the dated lifecycle from [fixtures/lifecycle.json](fixtures/lifecycle.json) through the unchanged JSONL boundary of the Go lifecycle host `src/lifecycle-core/cmd/lifecycle-core`. `run.py` subclasses `Driver` from `src/lifecycle-core/client/lifecycle_client.py`.
+5. It calls the new function with the unchanged `src/lifecycle-core/client/caller.py`.
 
 The lifecycle steps:
 

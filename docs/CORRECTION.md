@@ -5,7 +5,7 @@ A recorded answer can be wrong for two different reasons:
 - The application supplied a wrong fact. The rule is correct, but an input value is wrong.
 - The approved rule is wrong. The input is correct, but the rule gave the wrong answer.
 
-The lifecycle handles these two cases differently. This page uses the neutral record-filter scenario to show the boundary. The scenario is [lifecycle-scenario.json](../src/cel-lifecycle/fixtures/lifecycle-scenario.json), and [scenario.py](../src/cel-lifecycle/scenario.py) runs it.
+The lifecycle handles these two cases differently. This page uses the neutral record-filter scenario to show the boundary. The scenario is [lifecycle-scenario.json](../src/cel-lifecycle/fixtures/lifecycle-scenario.json), and [scenario.py](../src/lifecycle-core/client/scenario.py) runs it through the Go lifecycle host. [scenario_test.go](../src/lifecycle-core/scenario_test.go) runs the same scenario in the Go tests.
 
 To run this scenario with one command, use the [quickstart demo](../examples/quickstart/README.md).
 

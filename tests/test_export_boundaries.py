@@ -10,25 +10,25 @@ import tempfile
 import unittest
 
 ROOT=Path(os.environ.get('DECISION_EXPORT_SOURCE',Path(__file__).resolve().parents[1])).resolve()
-os.environ['CEL_LIFECYCLE_SOURCE']=str(ROOT/'src/cel-lifecycle')
+os.environ['LIFECYCLE_CLIENT_SOURCE']=str(ROOT/'src/lifecycle-core/client')
 sys.path.insert(0,str(ROOT/'examples/ci-trigger'))
-from support import GitStore,Fault,encode,content_ref,envelope,fixture
+from support import Fault,encode,content_ref,envelope,fixture,root
 from adapter import Ingress,project,link,verify_link
 WORK=Path(os.environ['EXPORT_TEST_WORK']);WORK.mkdir(parents=True,exist_ok=True)
+# LIFECYCLE_HOST names the Go JSONL host cmd/lifecycle-core. The ordinary baseline of ci-trigger runs under the same host.
+HOST=Path(os.environ['LIFECYCLE_HOST'])
 
 class ExportBoundaries(unittest.TestCase):
  def setUp(self):self.work=Path(tempfile.mkdtemp(dir=WORK));self.repo=self.work/'state.git'
- def framing(self,cli):
+ def test_lifecycle_oversized_line_cannot_execute_a_remainder(self):
   context={'actor':'reviewer','roles':['reviewer'],'scope':'framing-demo','runner_actor':'fixture-runner','worker':'framing-worker','functions':['record.visible']}
   path=self.work/'context.json';path.write_bytes(encode(context))
   q={'op':'source','expected_revision':'','request_key':'oversized-remainder','function':'record.visible','from':'2026-10-01','until':'2026-12-01','text':'Neutral framing regression.','supersedes':[],'reason':'Do not execute a fragment of a rejected line.'}
   wire=b' '*1048577+encode(q)
-  p=subprocess.run([sys.executable,'-B',str(cli),'--repo',str(self.repo),'--context',str(path),'--runtime',sys.executable,'--work',str(self.work)],input=wire,capture_output=True)
-  self.assertEqual(GitStore(self.repo).root(),'','a fragment of the rejected line changed accepted state')
+  p=subprocess.run([str(HOST),'--repo',str(self.repo),'--context',str(path),'--runtime',sys.executable,'--work',str(self.work)],input=wire,capture_output=True)
+  self.assertEqual(root(self.repo),'','a fragment of the rejected line changed accepted state')
   messages=[json.loads(line) for line in p.stdout.splitlines()]
   self.assertEqual(len(messages),1);self.assertEqual(messages[0]['status'],'invalid_request');self.assertNotEqual(p.returncode,0)
- def test_lifecycle_oversized_line_cannot_execute_a_remainder(self):self.framing(ROOT/'src/cel-lifecycle/cli.py')
- def test_ordinary_oversized_line_cannot_execute_a_remainder(self):self.framing(ROOT/'examples/ci-trigger/cli.py')
  def test_audit_identity_covers_the_receipt_link(self):
   raw=(ROOT/'examples/ci-trigger/fixtures/ready-review-envelope.json').read_bytes();ingress=Ingress(True,fixture()['repository']);inputs=project(raw,ingress)
   invocation={'receipt_ref':'sha256:'+'1'*64,'receipt':{'inputs_ref':content_ref(envelope('application/json',encode(inputs)))}}

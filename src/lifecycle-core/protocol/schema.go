@@ -1,8 +1,7 @@
 package protocol
 
 // A small JSON Schema 2020-12 validator. It supports only the keywords that
-// the files in src/protocol/schema use, the same as the Python reference
-// adapter.
+// the files in src/protocol/schema use.
 
 import (
 	"fmt"

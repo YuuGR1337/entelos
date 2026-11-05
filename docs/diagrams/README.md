@@ -6,7 +6,7 @@
 
 The diagram shows the complete path from [CONSTITUTION.md](../../CONSTITUTION.md): source, proposal, qualification, approval, dated activation, preparation, execution, feedback or correction, replay or restatement.
 
-- The center column names each stage and its operation in [lifecycle.py](../../src/cel-lifecycle/lifecycle.py).
+- The center column names each stage and its operation in [host.go](../../src/lifecycle-core/host.go).
 - The dashed boxes on the left show what the application supplies.
 - The shaded boxes on the right show what the reference records and checks. [CONTRACTS.md](../CONTRACTS.md) describes these contracts.
 - The dashed arrow shows that a fix makes a new revision, so the path starts again at source.

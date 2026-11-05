@@ -1,8 +1,8 @@
 # Storage port and DB-adapter obligations
 
-This record defines follow-on obligations. [storage-port-spec.md](storage-port-spec.md) specifies the port operations, error codes and invariants. The JSON vectors in [conformance/storage/](conformance/storage/) test that specification. The local Git adapter and an in-memory adapter ([memory_store.py](memory_store.py)) pass the vectors, and `verify.py` runs them. Only the Git adapter runs the Host conformance. This is not a tested production DB abstraction or a promise that this callback API needs no change for another adapter.
+This record defines follow-on obligations. [storage-port-spec.md](storage-port-spec.md) specifies the port operations, error codes and invariants. The JSON vectors in [conformance/storage/](conformance/storage/) test that specification. The local Git adapter ([gitstore.go](../lifecycle-core/gitstore.go)) and an in-memory adapter ([memstore.go](../lifecycle-core/memstore.go)) pass the vectors. The Go tests run them, and `verify.py` runs the Go tests. Only the Git adapter runs the Host conformance. This is not a tested production DB abstraction or a promise that this callback API needs no change for another adapter.
 
-The Host uses store `read(cursor)`, `transact(expected,key,payload,apply)` and accepted `history(cursor)`. A read view exposes its captured cursor/state and immutable `put`, `get`, `put_raw` and `get_raw` operations. Mutations run through validated Host commands; a candidate must not receive the raw trusted store callback. Git-specific plumbing stays in `git_store.py`.
+The Host uses store `read(cursor)`, `transact(expected,key,payload,apply)` and accepted `history(cursor)`. A read view exposes its captured cursor/state and immutable `put`, `get`, `put_raw` and `get_raw` operations. Mutations run through validated Host commands; a candidate must not receive the raw trusted store callback. Git-specific plumbing stays in `gitstore.go`.
 
 | Obligation | Local reference | Required DB behavior / conformance |
 |---|---|---|

@@ -14,7 +14,7 @@ I read these sources on 2026-10-30.
 | OpenFeature specification | `v0.9.0` | 2026-07-29 | [Flag evaluation](https://openfeature.dev/specification/sections/flag-evaluation), [Hooks](https://openfeature.dev/specification/sections/hooks), [releases](https://github.com/open-feature/spec/releases) |
 | Unleash | `v8.3.1` | 2026-10-29 | [Activation strategies](https://docs.getunleash.io/concepts/activation-strategies), [Unleash context](https://docs.getunleash.io/concepts/unleash-context), [Events](https://docs.getunleash.io/concepts/events), [Change requests](https://docs.getunleash.io/concepts/change-requests), [Impression data](https://docs.getunleash.io/concepts/impression-data), [Playground](https://docs.getunleash.io/concepts/playground), [Import and export](https://docs.getunleash.io/concepts/import-export), [releases](https://github.com/Unleash/unleash/releases) |
 
-The Entelos column refers to `main` at commit `784e0dc`. Its facts come from [CORRECTION.md](../CORRECTION.md), [WALKTHROUGH.md](../WALKTHROUGH.md) and [scenario.py](../../src/cel-lifecycle/scenario.py).
+The Entelos column refers to `main` at commit `784e0dc`. Its facts come from [CORRECTION.md](../CORRECTION.md), [WALKTHROUGH.md](../WALKTHROUGH.md) and [scenario.py](../../src/lifecycle-core/client/scenario.py).
 
 Evidence level for each service:
 
@@ -144,7 +144,7 @@ I did steps 2 and 4 by hand. The amendment process gave `true`, and the correcti
 
 - **Gradual rollout and experiments.** flagd has a `fractional` operator, and Unleash has gradual rollout strategies and variants. Entelos has no percentage rollout.
 - **A fast kill switch.** A flag service changes behavior for all callers when its configuration changes. It does not need a proposal, a qualification and a decision first. If the change is a release toggle with no record obligation, the Entelos path adds steps that give no value.
-- **Many languages and services.** OpenFeature has SDKs for many languages and a provider model. Entelos has one Go host and a Python lifecycle, with a string/bool profile only.
+- **Many languages and services.** OpenFeature has SDKs for many languages and a provider model. Entelos has one Go host and a Go lifecycle core, with a string/bool profile only.
 - **People who do not edit code.** Unleash has a web UI, an event log with user identity and, in Enterprise, approvals. Entelos has no authentication and no UI.
 - **Richer context.** Unleash has numeric, date, semver, regex and IP operators. The Entelos callable profile accepts string and bool inputs only.
 

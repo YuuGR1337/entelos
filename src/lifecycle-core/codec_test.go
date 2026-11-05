@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// The expected bytes are the output of the Python reference codec
-// (src/cel-lifecycle/git_store.py encode(decode(input))), recorded once.
+// The expected bytes were recorded once from the removed reference codec
+// (encode(decode(input))). They are fixed values now.
 func TestCodecMatchesTheReferenceCodec(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{`{"b":1,"a":[true,false,null]}`, "{\"a\":[true,false,null],\"b\":1}\n"},

@@ -222,7 +222,7 @@ def main():
             code, stays = sidecar.stop()
             run.checks.append({'name': name + '-shutdown', 'passed': code == 0 and not stays, 'actual': {'exit_code': code, 'socket_stays': stays}})
     # The client must not load lifecycle code. It reaches the lifecycle only through the sockets.
-    loaded = sorted(set(sys.modules) & {'lifecycle', 'git_store', 'memory_store', 'cel_runtime', 'reference_adapter'})
+    loaded = sorted(set(sys.modules) & {'lifecycle', 'lifecycle_client', 'scenario', 'git_store', 'memory_store', 'cel_runtime', 'reference_adapter'})
     run.checks.append({'name': 'no-lifecycle-import', 'passed': not loaded, 'actual': loaded})
     passed = error is None and bool(run.checks) and all(x['passed'] for x in run.checks)
     result = {'kind': 'SidecarClientExample', 'status': 'passed' if passed else 'failed', 'error': error,

@@ -55,8 +55,8 @@ The edge apps are native Swift and Kotlin apps, so gomobile is the best fit. Dec
 
 ## Consequences
 
-- The lifecycle core moves from Python to Go. The Python core stays as the reference until the Go core passes the same conformance vectors. A separate change removes it.
-- Storage and protocol vectors are JSON, so the same files test both cores.
+- The lifecycle core moves from Python to Go. The Python core stays as the reference until the Go core passes the same conformance vectors. A separate change removes it. Issue #95 removed the Python core.
+- Storage and protocol vectors are JSON, so the same files test both cores. After issue #95, they test the Go core only.
 - Windows stays outside the tested scope, because the socket and the concurrency test are POSIX.
 
 ## Limits

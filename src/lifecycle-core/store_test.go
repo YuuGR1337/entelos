@@ -204,6 +204,48 @@ func TestInterruptionBeforePublicationThenRecovery(t *testing.T) {
 	})
 }
 
+// The root CAS succeeds, but the reply is lost. A retry with the old
+// expected revision, after a later write, gives the original cursor and
+// result without a second apply. Another payload with the key is refused.
+func TestLostReplyRetryGivesTheOriginalResult(t *testing.T) {
+	s, err := OpenGitStore(filepath.Join(t.TempDir(), "state.git"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Hook = func(g *GitStore, args []string, data []byte) (GitResult, error) {
+		result, err := g.RunGit(args, data)
+		if args[0] == "update-ref" && err == nil && result.Code == 0 {
+			g.Hook = nil
+			return GitResult{}, NewFault("simulated_reply_loss", "injected after a successful CAS", "store")
+		}
+		return result, err
+	}
+	payload := Object{"op": "test-marker"}
+	stage := func(v *View) (any, error) {
+		return Object{"marker": v.Put("test-marker", Object{"note": "committed before reply loss"})}, nil
+	}
+	if _, err := s.Transact("", "reply-lost", payload, stage); code(err) != "simulated_reply_loss" {
+		t.Fatalf("got %v", err)
+	}
+	accepted := root(t, s).Cursor
+	if accepted == "" {
+		t.Fatal("the CAS did not publish")
+	}
+	if _, err := s.Transact(accepted, "later", Object{"op": "later"}, func(*View) (any, error) { return Object{"later": "accepted"}, nil }); err != nil {
+		t.Fatal(err)
+	}
+	retry, err := s.Transact("", "reply-lost", payload, func(*View) (any, error) {
+		t.Fatal("the retry applied the command twice")
+		return nil, nil
+	})
+	if err != nil || retry["reused"] != true || retry["cursor"] != accepted {
+		t.Fatalf("retry: %v %v", retry, err)
+	}
+	if _, err := s.Transact(accepted, "reply-lost", Object{"op": "different"}, stage); code(err) != "idempotency_conflict" {
+		t.Fatalf("conflict: %v", err)
+	}
+}
+
 func TestStorageFailureIsNotAStaleWriter(t *testing.T) {
 	eachStore(t, func(t *testing.T, s Store) {
 		first := write(t, s, "", "a", "1")
@@ -300,9 +342,8 @@ func TestReuseRefusesAHistoryRootWithoutRequests(t *testing.T) {
 	}
 }
 
-// A media type that is not UTF-8 is a request error, as in the Python
-// reference: there, bytes.decode raises UnicodeDecodeError and the Host maps
-// it to invalid_request.
+// A media type that is not UTF-8 is a request error. The Host maps it to
+// invalid_request.
 func TestNonUTF8MediaTypeFollowsTheReference(t *testing.T) {
 	view := root(t, NewMemoryStore())
 	ref := view.PutRaw("\xff", []byte("x"))

@@ -1,8 +1,8 @@
 package lifecycle
 
-// Value helpers keep the request semantics of the Python reference Host.
+// Value helpers keep the request semantics of the lifecycle Host.
 // A missing field or a wrong JSON type is a requestError. Host.Handle turns
-// it into an invalid_request diagnostic, as the Python Host does.
+// it into an invalid_request diagnostic.
 
 import (
 	"fmt"

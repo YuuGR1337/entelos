@@ -1,6 +1,6 @@
 // Command lifecycle-core is the JSONL host of the Go lifecycle core. The host
 // selects the context and the runtime; a request cannot supply authority.
-// It has the same arguments and wire form as src/cel-lifecycle/cli.py.
+// Each input line is one request record. Each output line is one response record.
 package main
 
 import (

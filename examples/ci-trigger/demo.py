@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Application workflow orchestration using unchanged lifecycle commands."""
+"""Application workflow orchestration with unchanged lifecycle commands to the Go JSONL host."""
 import json
 from pathlib import Path
 import shutil
 import subprocess
-from support import LIFE,ROOT,Driver,Fault,encode,decode,content_ref,envelope,MIMES,fixture
+from support import ROOT,Driver,READS,encode,decode,content_ref,envelope,MIMES,fixture
 from adapter import Ingress,project,link,verify_link,build_ref as projection_build
 from ordinary import build_ref as ordinary_build
 
 class CIDriver(Driver):
-    def __init__(self,work,binary,backend,seed=None):
+    """The CI consumer through the Go JSONL host. runtime is the CEL executable or the ordinary runtime executable."""
+    def __init__(self,work,runtime,backend,host,seed=None):
         self.spec=fixture();self.backend=backend;self.namespace='ci-'+backend
-        super().__init__(LIFE if backend=='cel' else ROOT,work,binary,{'function':self.spec['function'],'scope':self.spec['scope']})
+        super().__init__(work,runtime,{'function':self.spec['function'],'scope':self.spec['scope']},host)
         if seed:shutil.copytree(seed,self.repo)
         for path in self.contexts.values():
             context=decode(path.read_bytes());context['worker']=self.spec['worker'];path.write_bytes(encode(context))
     def call(self,actor,op,name=None,expected='ok',**values):
-        from lifecycle import READS
         if op not in READS:values.setdefault('request_key',self.namespace+':'+(name or op+'-'+str(self.counter+1)))
         return super().call(actor,op,name,expected,**values)
     def result(self,value):return value['result']

@@ -6,7 +6,7 @@ The project name is Entelos, with the tagline "Entelos: grow toward the goal." O
 
 ## Source reference
 
-The source reference contains a primitive typed CEL callable, a local qualified Git lifecycle, record-filter and PR CI examples, and an ordinary-function comparison. APIs and record formats are unstable. See [SUPPORT.md](SUPPORT.md) for the tested environment and operating limits.
+The source reference contains a primitive typed CEL callable, a local qualified Git lifecycle in Go, record-filter and PR CI examples, and an ordinary-function comparison. APIs and record formats are unstable. See [SUPPORT.md](SUPPORT.md) for the tested environment and operating limits.
 
 ## Licence
 
@@ -100,11 +100,13 @@ On 2026-11-05, the maintainer approved the M6 scope in issue #77. Decision [0002
 
 On 2026-11-05, the maintainer accepted the [technology decision](decisions/0001-technology.md): Go for the core and the sidecar, JSON with RFC 8785 digests on a Unix socket, and a gomobile executor package for native Swift and Kotlin apps.
 
-Issue #79 adds a storage port spec, 11 JSON storage vectors and an in-memory adapter. The Git adapter and the in-memory adapter pass all vectors. `verify.py` runs them as the `storage-vectors` check. The vectors do not show durability or performance.
+Issue #79 adds a storage port spec, 11 JSON storage vectors and an in-memory adapter. The Git adapter and the in-memory adapter pass all vectors. The Go tests run them in the `go-lifecycle-core` check of `verify.py`. The vectors do not show durability or performance.
 
 Issue #80 adds the [qualification runner contract](../src/lifecycle-core/RUNNER.md) to the Go core. CEL is the first runner, and a test-only fixture runner shows that runners plug in.
 
 Issue #84 adds the Go sidecar `entelos-sidecar`: wire protocol 1.0 on a Unix socket with mode 0600. It passes all session vectors through the socket (`sidecar-protocol`), and [examples/sidecar-client](../examples/sidecar-client/README.md) completes propose, qualify, decide, activate and invoke through the socket only (`sidecar-client`). There is no authentication beyond the file mode.
+
+Issue #95 removes the Python lifecycle core: the Python Host, its Git and in-memory stores, its JSONL CLI, the protocol reference adapter and the parity tool. The Go core in `src/lifecycle-core` is now the only Host. `scenario_test.go` runs the lifecycle scenario with the fixture values. Each removed Python test has a Go test or a vector with the same expected values. The examples call the Go JSONL host through the Python callers in `src/lifecycle-core/client/`. `src/cel-lifecycle` keeps the specs, the vectors and the fixtures.
 
 Keep caller walkthrough and input-correction documentation bounded to the existing examples. Numeric/structured profiles, production DBs, authentication gateways and resident-worker coordination are outside the current implemented scope.
 

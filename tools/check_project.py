@@ -40,11 +40,11 @@ if '@CONSTITUTION.md' not in gemini or '@AGENTS.md' not in gemini:errors.append(
 # Classification regressions: each path must keep its CI and security-review class.
 sys.path.insert(0,str(ROOT/'tools'))
 from classify_change import classify
-for path,code,security in [('README.md',False,False),('src/cel-lifecycle/lifecycle.py',True,True),
-        ('src/cel-lifecycle/git_store.py',True,True),('src/cel-handoff/handoff_test.go',True,False),('src/cel-handoff/go.sum',True,True),
+for path,code,security in [('README.md',False,False),('src/lifecycle-core/host.go',True,True),
+        ('src/lifecycle-core/gitstore.go',True,True),('src/lifecycle-core/client/lifecycle_client.py',True,True),('src/cel-handoff/handoff_test.go',True,False),('src/cel-handoff/go.sum',True,True),
         ('tools/classify_change.py',True,True),('.github/workflows/ci.yml',True,True),('.codex/config.toml',False,True),('GEMINI.md',False,True),
         ('docs/AGENTS.md',False,True),('src/cel-handoff/tools/prepare.py',True,True),('examples/ci-trigger/run.py',True,True),
-        ('src/cel-lifecycle/test_lifecycle.py',True,False),('tests/test_export_boundaries.py',True,False),('docs/STATUS.md',False,False),('docs/REVIEW.md',False,True),('src/cel-lifecycle/.claude/settings.json',True,True),
+        ('src/protocol/test_protocol.py',True,False),('src/lifecycle-core/scenario_test.go',True,False),('tests/test_export_boundaries.py',True,False),('docs/STATUS.md',False,False),('docs/REVIEW.md',False,True),('src/cel-lifecycle/.claude/settings.json',True,True),
         ('tests/AGENTS.md',True,True),('tests/CLAUDE.md',True,True),('tests/.claude/settings.json',True,True),('tests/go.mod',True,True),('src/cel-handoff/x_test.go',True,False)]:
     got=classify([path])
     if (got['code'],got['security'])!=(code,security):errors.append('classification changed for %s: code=%s security=%s'%(path,got['code'],got['security']))

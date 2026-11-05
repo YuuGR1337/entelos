@@ -1,9 +1,8 @@
 package lifecycle
 
-// The record codec gives the same bytes as the Python reference codec
-// (json.dumps with sort_keys, ensure_ascii=False, compact separators and a
-// final newline). Content references depend on these bytes, so both cores
-// must agree byte for byte.
+// The record codec writes sorted keys, raw UTF-8, compact separators and a
+// final newline. Content references depend on these bytes. The bytes agree
+// with the stored records and the conformance vectors, so they must not change.
 
 import (
 	"bytes"

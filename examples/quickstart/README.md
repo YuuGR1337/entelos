@@ -12,8 +12,9 @@ Use a new path outside this checkout for `--work`. The directory must not exist.
 
 1. It builds the `cel-handoff` host with the same pinned flags and isolated settings as `verify.py`.
 2. It prepares the record bundle with `src/cel-handoff/tools/prepare.py`.
-3. It runs the unchanged lifecycle scenario `src/cel-lifecycle/scenario.py` on the fixture `src/cel-lifecycle/fixtures/lifecycle-scenario.json`.
-4. It prints a short summary and writes `summary.json` to the work directory.
+3. It builds the Go lifecycle host `src/lifecycle-core/cmd/lifecycle-core` to `<work>/bin/lifecycle-core`.
+4. It runs the unchanged lifecycle scenario `src/lifecycle-core/client/scenario.py` on the fixture `src/cel-lifecycle/fixtures/lifecycle-scenario.json`. The scenario sends each request to the Go host.
+5. It prints a short summary and writes `summary.json` to the work directory.
 
 ## What the summary shows
 
@@ -30,10 +31,10 @@ The expected values come from the `expected` field of the fixture, not from the 
 If the demo passes, it prints one command that prints the receipt of the first answer. The `receipt_command` field of `summary.json` holds the same command. The command has this form:
 
 ```sh
-printf '%s\n' '{"op":"receipt","receipt_ref":"<receipt_ref>"}' | python3 -B src/cel-lifecycle/cli.py --repo <work>/loop/state.git --context <work>/loop/reader.json --runtime <work>/bin/cel-handoff --work <work>/loop | python3 -m json.tool
+printf '%s\n' '{"op":"receipt","receipt_ref":"<receipt_ref>"}' | <work>/bin/lifecycle-core --repo <work>/loop/state.git --context <work>/loop/reader.json --runtime <work>/bin/cel-handoff --work <work>/loop | python3 -m json.tool
 ```
 
-The demo fills in the full receipt reference and the absolute paths. The command sends the `receipt` read operation to the lifecycle CLI, with the reader context of the demo. It reads the Git store and does not change it.
+The demo fills in the full receipt reference and the absolute paths. The command sends the `receipt` read operation to the Go lifecycle host, with the reader context of the demo. It reads the Git store and does not change it.
 
 The receipt contains the function, the scope, the date, the engine build and the references of the input, the response, the rule version (`selection.snapshot_ref`) and the approval. The input and the response are separate records in the store. [WALKTHROUGH.md](../../docs/WALKTHROUGH.md) shows how to replay this receipt.
 

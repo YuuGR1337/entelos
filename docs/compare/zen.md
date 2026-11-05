@@ -102,7 +102,7 @@ These features are in the GoRules BRMS, not in the MIT-licensed engine. I read t
 - **Business users edit the rules.** The BRMS has a visual graph editor, decision tables and a simulator with a trace for each node. Entelos has no editor. Its authors write CEL and JSON source tables.
 - **Structured input and output.** A ZEN graph reads nested JSON and can return any JSON value. The current Entelos profile accepts only string and bool inputs and gives a bool output.
 - **A managed review and release flow.** The BRMS has branches, visual diffs, merge requests with group approval, immutable releases and per-environment deploy approval. Entelos is a local reference on a Git store and has no user interface.
-- **Embedding in many languages.** The engine has a Rust core with bindings for Node.js, Python, Go, Java, Kotlin and .NET. The Entelos host is a Go command, and the lifecycle is Python.
+- **Embedding in many languages.** The engine has a Rust core with bindings for Node.js, Python, Go, Java, Kotlin and .NET. The Entelos host is a Go command, and the lifecycle core is Go.
 
 If the main need is a record of each answer, a dated activation, and replay or restatement that links to the earlier answer, ZEN supplies parts. The application must then supply the evaluation log, the activation date and the link records.
 
