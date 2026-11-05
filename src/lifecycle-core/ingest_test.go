@@ -430,7 +430,7 @@ func TestIngestRequestKeyBindsTheExecutor(t *testing.T) {
 		t.Fatal(err)
 	}
 	before, _ := store.Read(nil)
-	for _, change := range []Object{{"actor": "executor-b", "worker": "executor-b"}, {"upload_inputs": true}} {
+	for _, change := range []Object{{"worker": "executor-b"}, {"upload_inputs": true}} {
 		other, err := NewHost(store, nil, merge(host.Context, change))
 		if err != nil {
 			t.Fatal(err)

@@ -193,8 +193,9 @@ func TestBodyCannotReplaceOperation(t *testing.T) {
 }
 
 // The validator applies minimum and maximum to each integer, also above
-// the range of int64. A float64 bound with an integer value is exact. A
-// bound that is not an integer is a schema error, not a zero bound.
+// the range of int64, if the bound is a lifecycle.Int. A float64 bound is
+// exact only up to 2^53-1. A bound that is not an integer is a schema
+// error, not a zero bound.
 func TestIntegerBounds(t *testing.T) {
 	s := &Schemas{}
 	schema := lifecycle.Object{"type": "integer", "minimum": lifecycle.Int{Text: "1"}, "maximum": float64(9007199254740991)}
