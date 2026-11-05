@@ -49,10 +49,29 @@
        "properties": {
         "format": {
          "const": "entelos.record/1"
+        },
+        "stale": {
+         "type": "boolean"
+        },
+        "stale_mode": {
+         "enum": [
+          "fail_closed",
+          "continue_stale"
+         ]
+        },
+        "stale_reason": {
+         "enum": [
+          "",
+          "expired",
+          "revoked"
+         ]
         }
        },
        "required": [
-        "format"
+        "format",
+        "stale",
+        "stale_mode",
+        "stale_reason"
        ],
        "type": "object"
       },

@@ -33,8 +33,10 @@ class Driver(lifecycle_client.Driver):
         return source,plan
     def propose(self,stage,source,base,bundle,name=None,expected='ok'):
         table=self.fixture[stage]
+        # A stage that names a stale mode declares it in the proposal.
+        mode={'stale_mode':table['stale_mode']} if 'stale_mode' in table else {}
         return self.call('author','propose',name=name or stage+'-proposal',expected=expected,function=self.fixture['function'],
-                         **{'from':table['from'],'until':table['until']},base_snapshot=base,source_ref=source,bundle=bundle,reason=stage+' proposal')
+                         **{'from':table['from'],'until':table['until']},base_snapshot=base,source_ref=source,bundle=bundle,reason=stage+' proposal',**mode)
     def qualify_decide(self,snapshot,plan,prefix):
         q=self.result(self.call('runner','qualify',name=prefix+'-qualify',snapshot_ref=snapshot,plan_ref=plan))
         d=self.result(self.call('reviewer','decide',name=prefix+'-decide',report_ref=q['report_ref'],reason='manual fixture approval'))
@@ -108,6 +110,9 @@ def demonstrate(d,example):
     q3,dec3=d.qualify_decide(snap3,p3,'correction')
     suspension=d.result(d.call('reviewer','suspend',name='suspend-wrong-future',function=fun,**{'from':f['correction']['from'],'until':f['correction']['until']},targets=[future],reason='stop serving incorrect source data'))['event_ref']
     d.call('caller','describe',name='suspension-no-fallback',expected='out_of_scope',function=fun,date='2026-11-15')
+    # The worker loaded the amendment. The amendment declares no stale mode, so the invocation fails closed.
+    d.call('caller','invoke',name='revoked-fails-closed',expected='activation_revoked',function=fun,date='2026-11-15',expected_bundle_ref=amendment['bundle_ref'],inputs=f['original_input'])
+    d.call('caller','invoke',name='expired-fails-closed',expected='activation_expired',function=fun,date='2026-12-15',expected_bundle_ref=amendment['bundle_ref'],inputs=f['original_input'])
     current_oct=d.call('reader','resolve',function=fun,date='2026-10-15')
     enabled=d.result(d.call('reviewer','activate',name='activate-correction',decision_ref=dec3,targets=[future,suspension]))['event_ref']
     correction_cursor=d.cursor()
@@ -121,11 +126,15 @@ def demonstrate(d,example):
     d.call('reader','replay',name='changed-replay-inputs',expected='input_mismatch',receipt_ref=before['receipt_ref'],inputs_json='{"state":"approved","archived":false}',reason='must not change old inputs')
     retained=d.call('reader','receipt',receipt_ref=before['receipt_ref'])
     d.check('correction-pinned-replay-restatement','Can an operator preserve the old answer and compute a separate corrected answer?',after['actual']['value'] is exp['corrected_november_reviewed'] and replay['actual']['value'] is exp['pinned_replay'] and replay['receipt']['matches_original'] is True and restated['actual']['value'] is exp['later_restatement'] and retained==before['receipt'] and replay['receipt']['selection']['snapshot_ref']==snap2 and restated['receipt']['selection']['snapshot_ref']==snap3 and current_oct['snapshot_ref']==snap1,{'before':before,'after':after,'replay':replay,'restatement':restated,'retained_old_receipt':retained})
+    # The correction declares continue_stale. After its until date, the loaded correction gives the answer, and the receipt is stale.
+    stale_call=d.result(d.call('caller','invoke',name='expired-continue-stale',function=fun,date='2026-12-15',expected_bundle_ref=corrected['bundle_ref'],inputs=f['original_input']))
+    stale_read=d.call('reader','receipt',receipt_ref=stale_call['receipt_ref'])
+    d.check('stale-continuation','Does an expired continue_stale activation give a stale receipt, while live answers stay not stale?',stale_call['actual']['value'] is exp['stale_after_expiry'] and stale_read['stale'] is True and stale_read['stale_mode']=='continue_stale' and stale_read['stale_reason']=='expired' and stale_read['selection']['snapshot_ref']==snap3 and after['receipt']['stale'] is False and after['receipt']['stale_mode']=='continue_stale' and before['receipt']['stale'] is False and before['receipt']['stale_mode']=='fail_closed',{'stale':stale_read,'live_correction':after['receipt'],'live_amendment':before['receipt']})
     complete=d.result(d.call('other-maintainer','checkpoint',name='complete-correction',task_id=observation['task_id'],checkpoint=taken['checkpoint'],token=taken['token'],status='complete',note='Source correction activated; original answer replayed and correction restated.',correction_snapshot=snap3))
     d.check('restart-and-fenced-task','Can a fresh process resume a saved task while rejecting the old owner?',complete['status']=='complete' and complete['correction_snapshot']==snap3,complete)
     state=d.call('reviewer','inspect')['state']
     d.check('retained-history-and-outbox','Are earlier evidence/plans/receipts retained with acknowledged load events?',len(state['sources'])==3 and len(state['plans'])==3 and state['outbox'][enabled]['status']=='acknowledged' and before['receipt_ref'] in state['receipts'],{'sources':state['sources'],'plans':state['plans'],'outbox':state['outbox'],'receipts':state['receipts']})
-    return {'initial_snapshot':snap1,'future_snapshot':snap2,'correction_snapshot':snap3,'future_event':future,'correction_event':enabled,'decision':dec3,'old_receipt':before['receipt_ref'],'new_receipt':restated['receipt_ref'],'historical_cursor':historical,'correction_cursor':correction_cursor}
+    return {'initial_snapshot':snap1,'future_snapshot':snap2,'correction_snapshot':snap3,'future_event':future,'correction_event':enabled,'decision':dec3,'old_receipt':before['receipt_ref'],'new_receipt':restated['receipt_ref'],'historical_cursor':historical,'correction_cursor':correction_cursor,'stale_receipt':stale_call['receipt_ref']}
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--work',type=Path,required=True);p.add_argument('--runtime',type=Path,required=True);p.add_argument('--bundle',type=Path,required=True);p.add_argument('--fixture',type=Path,required=True)

@@ -17,7 +17,8 @@
   "correction": {
     "from": "2026-11-01",
     "until": "2026-12-01",
-    "allowed_state": "approved"
+    "allowed_state": "approved",
+    "stale_mode": "continue_stale"
   },
   "original_input": {
     "state": "reviewed",
@@ -28,6 +29,7 @@
     "future_november_reviewed": true,
     "corrected_november_reviewed": false,
     "pinned_replay": true,
-    "later_restatement": false
+    "later_restatement": false,
+    "stale_after_expiry": false
   }
 }

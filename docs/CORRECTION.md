@@ -34,6 +34,7 @@ The scenario names this call `november-before-correction`. The answer is `true`.
 - `inputs_ref`: the content identity of the normalized input bytes. The host's fixed JSON encoding sorts the keys.
 - `selection`: the function, scope, date, event, snapshot, bundle, engine build and `registry_cursor` that the call used.
 - `response_ref`, `engine_build`, `lifecycle_build`, `invocation_id`, `previous_receipt` and `reason`.
+- `stale_mode`, `stale` and `stale_reason`. This receipt is not stale. [CONTRACTS.md](CONTRACTS.md#expiry-and-revocation) gives the stale rule.
 
 The receipt does not refer to an application record, a database row or a fact source. It stores the input values themselves. The lifecycle does not know where those values came from.
 
