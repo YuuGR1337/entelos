@@ -191,6 +191,8 @@ The executor in `src/cel-handoff/executor.go` runs one pinned activation away fr
 
 The pin must name the loaded bundle (else `artifact_mismatch`), the build of this executor (else `implementation_unavailable`) and the bundle function. A bundle that qualification passed on another build fails closed. Qualification is for each build. The WASM module has its own `implementation_ref`, and the Host qualifies with that module under Node. The executor does not verify the pin claims against a store. A content reference is an identity, not a signature.
 
+If a pin has more than one error, the executor reports the first one in this fixed order: the pin JSON, the bundle load, `function`, `scope`, `snapshot_ref`, `bundle_ref`, `engine_build`, `revoked`, `stale_mode`, `from`, `until`, the interval, then the function, bundle and build matches. Thus one pin always gives the same diagnostic.
+
 `Invoke` takes a cursor, a date and the inputs JSON. It gives one entry with the ingest fields `cursor`, `snapshot_ref`, `date`, `inputs_ref`, `response` and `stale_reason`. The entry has no raw inputs. The embedding host keeps them and uploads them only if the upload policy permits it. The rules follow `invoke` (see [Expiry and revocation](#expiry-and-revocation)):
 
 1. A date before `from` is `out_of_scope`.
@@ -202,7 +204,13 @@ A refusal gives a diagnostic and no entry, so the embedding host writes nothing 
 
 `inputs_ref` is the content reference of the record codec bytes of the inputs, the same as `InputDigest`. The engine request has the bytes that the Host sends, so the request byte limit applies the same way.
 
-The JavaScript bridge in `cmd/cel-handoff/bridge_js.go` gives the executor as `globalThis.entelosExecutor` with `build()`, `load(pinJSON, files)` and `invoke(cursor, date, inputsJSON)`. Each function returns a JSON string, `{"ok": value}` or `{"diagnostic": d}`. The bundle files are `Uint8Array` values. A module with no command arguments serves the bridge. Under Node with arguments, the same module serves the command line.
+The JavaScript bridge in `cmd/cel-handoff/bridge_js.go` gives the executor as `globalThis.entelosExecutor` with `build()`, `load(pinJSON, files)` and `invoke(cursor, date, inputsJSON)`. Each function returns a JSON string, `{"ok": value}` or `{"diagnostic": d}`. The bundle files are `Uint8Array` values. The bridge adds these refusals:
+
+- `load` with wrong argument types, or a bundle file that is not a `Uint8Array`, is `invalid_request` at the `bridge` stage. The files are checked in the order `manifest`, `environment`, `source`, `fixed`.
+- `invoke` before a successful `load` is `revision_not_loaded`. A failed `load` keeps the executor that was loaded before it.
+- `invoke` with wrong argument types is `invalid_request` at the `bridge` stage. A cursor that is not an integer is `invalid_request` at the `log` stage, the same as a cursor out of range.
+
+A module with no command arguments serves the bridge. Under Node with arguments, the same module serves the command line.
 
 The vectors in [conformance/executor/](../src/cel-lifecycle/conformance/executor/) state the expected entries and refusals. Each vector has a bundle without a build identity, a pin without `bundle_ref` and `engine_build`, and steps. A harness binds the bundle and the pin to the build under test. `executor_test.go` runs the vectors on a native build and as WASM under Node. `web/node-check.mjs` runs them through the bridge. `verify.py` compares the three results: they must be equal except for the build identity and the bundle reference. `TestExecutorVectorDigestsAgreeWithTheHostCodec` checks each stated `inputs_ref` with the Host codec.
 

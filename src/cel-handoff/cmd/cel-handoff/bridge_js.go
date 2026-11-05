@@ -62,12 +62,16 @@ func serveBridge() {
 			return refuse("invalid_request", "", "load takes a pin JSON string and a files object")
 		}
 		var f h.Files
-		for name, dst := range map[string]*[]byte{"manifest": &f.Manifest, "environment": &f.Environment, "source": &f.Source, "fixed": &f.Fixed} {
-			raw, ok := bytesArg(args[1].Get(name))
+		// A fixed order gives one diagnostic for one call.
+		for _, file := range []struct {
+			name string
+			dst  *[]byte
+		}{{"manifest", &f.Manifest}, {"environment", &f.Environment}, {"source", &f.Source}, {"fixed", &f.Fixed}} {
+			raw, ok := bytesArg(args[1].Get(file.name))
 			if !ok {
-				return refuse("invalid_request", "/"+name, "each bundle file must be a Uint8Array")
+				return refuse("invalid_request", "/"+file.name, "each bundle file must be a Uint8Array")
 			}
-			*dst = raw
+			*file.dst = raw
 		}
 		next, d := h.NewExecutor([]byte(args[0].String()), f)
 		if d != nil {
@@ -86,10 +90,11 @@ func serveBridge() {
 			return refuse("invalid_request", "", "invoke takes a cursor number, a date string and an inputs JSON string")
 		}
 		// The executor checks the cursor range. The bridge refuses only a
-		// number that is not an integer in the int64 range.
+		// number that is not an integer in the int64 range, with the same
+		// stage as the executor.
 		n := args[0].Float()
 		if n != math.Trunc(n) || math.Abs(n) >= 1<<62 {
-			return refuse("invalid_request", "/cursor", "cursor must be an integer from 1 to 2^53-1")
+			return reply(nil, &h.Diagnostic{Code: "invalid_request", Stage: "log", Field: "/cursor", Message: "cursor must be an integer from 1 to 2^53-1"})
 		}
 		entry, d := executor.Invoke(context.Background(), int64(n), args[1].String(), []byte(args[2].String()))
 		if d != nil {

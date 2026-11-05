@@ -122,7 +122,9 @@ try:
  def executor_results(name):
   path=w/'executor'/name
   if not path.exists():return None,None
-  d=json.loads(path.read_text());text=json.dumps(d['vectors'],sort_keys=True).replace(d['implementation_ref'],'<build>')
+  d=json.loads(path.read_text());text=json.dumps(d.get('vectors'),sort_keys=True)
+  if not d.get('implementation_ref') or d.get('vectors') is None:return d,None
+  text=text.replace(d['implementation_ref'],'<build>')
   text=re.sub(r'"bundle_ref": "sha256:[0-9a-f]{64}"','"bundle_ref": "<bundle>"',text)
   return d,[{k:v for k,v in r.items() if v is not None} for x in json.loads(text).values() for r in x]
  native,native_steps=executor_results('native.json');test,test_steps=executor_results('wasm-test.json');bridge,bridge_steps=executor_results('bridge.json')
@@ -131,7 +133,7 @@ try:
        'node_cold_start_ms':(bridge or {}).get('host',{}).get('cold_start_ms'),'node_version':node_version}
  check('wasm-executor','Do the executor vectors pass on the native build, as WASM under Node and through the bridge, with the same entries except the build and bundle identities?',
        all(x.returncode==0 for x in wasm_stages) and go_tests.returncode==0 and native_steps is not None and bool(native_steps)
-       and native_steps==test_steps==bridge_steps and bridge['errors']==[] and bridge['implementation_ref']==wasm_build.get('implementation_ref'),
+       and native_steps==test_steps==bridge_steps and (bridge or {}).get('errors')==[] and (bridge or {}).get('implementation_ref')==wasm_build.get('implementation_ref'),
        {'stages':{c['name']:c['exit_code'] for c in commands if c['name'] in ('build-wasm','go-tests-wasm','go-vet-wasm','bridge-vectors')},
         'steps':len(native_steps or []),'bridge_errors':(bridge or {}).get('errors'),'measurements':size})
  # The Go lifecycle scenario again, with the WASM module as the engine. Each snapshot then pins the WASM build.

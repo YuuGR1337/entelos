@@ -68,14 +68,15 @@ func NewExecutor(pinJSON []byte, f Files) (*Executor, *Diagnostic) {
 	if d != nil {
 		return nil, d
 	}
-	for field, value := range map[string]string{"/function": pin.Function, "/scope": pin.Scope} {
-		if value == "" {
-			return nil, diag("invalid_pin", "pin", field, "a nonempty string is required")
+	// The checks run in a fixed order, so one pin always gives the same diagnostic.
+	for _, c := range []struct{ field, value string }{{"/function", pin.Function}, {"/scope", pin.Scope}} {
+		if c.value == "" {
+			return nil, diag("invalid_pin", "pin", c.field, "a nonempty string is required")
 		}
 	}
-	for field, value := range map[string]string{"/snapshot_ref": pin.SnapshotRef, "/bundle_ref": pin.BundleRef, "/engine_build": pin.EngineBuild} {
-		if !contentRef.MatchString(value) {
-			return nil, diag("invalid_pin", "pin", field, "a sha256 content reference is required")
+	for _, c := range []struct{ field, value string }{{"/snapshot_ref", pin.SnapshotRef}, {"/bundle_ref", pin.BundleRef}, {"/engine_build", pin.EngineBuild}} {
+		if !contentRef.MatchString(c.value) {
+			return nil, diag("invalid_pin", "pin", c.field, "a sha256 content reference is required")
 		}
 	}
 	if pin.Revoked == nil {

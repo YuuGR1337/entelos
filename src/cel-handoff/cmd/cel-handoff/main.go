@@ -58,12 +58,16 @@ func main() {
 		os.Exit(2)
 	}
 	var f h.Files
-	for name, dst := range map[string]*[]byte{"manifest.json": &f.Manifest, "env.json": &f.Environment, "rule.cel": &f.Source, "fixed.json": &f.Fixed} {
-		raw, err := readBound(filepath.Join(*dir, name))
+	// A fixed order gives one diagnostic for one bundle directory.
+	for _, file := range []struct {
+		name string
+		dst  *[]byte
+	}{{"manifest.json", &f.Manifest}, {"env.json", &f.Environment}, {"rule.cel", &f.Source}, {"fixed.json", &f.Fixed}} {
+		raw, err := readBound(filepath.Join(*dir, file.name))
 		if err != nil {
-			fail(&h.Diagnostic{Code: "artifact_unavailable", Stage: "bundle", Field: "/" + name, Message: err.Error()})
+			fail(&h.Diagnostic{Code: "artifact_unavailable", Stage: "bundle", Field: "/" + file.name, Message: err.Error()})
 		}
-		*dst = raw
+		*file.dst = raw
 	}
 	b, d := h.Load(f)
 	if d != nil {

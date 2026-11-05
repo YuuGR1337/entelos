@@ -160,6 +160,44 @@
     "stage": "pin",
     "field": ""
    }
+  },
+  {
+   "name": "empty-function-and-scope",
+   "pin_replace": {
+    "function": "",
+    "scope": ""
+   },
+   "expect": {
+    "code": "invalid_pin",
+    "stage": "pin",
+    "field": "/function"
+   }
+  },
+  {
+   "name": "bad-references",
+   "pin_replace": {
+    "snapshot_ref": "x",
+    "bundle_ref": "y",
+    "engine_build": "z"
+   },
+   "expect": {
+    "code": "invalid_pin",
+    "stage": "pin",
+    "field": "/snapshot_ref"
+   }
+  },
+  {
+   "name": "bad-stale-mode-and-dates",
+   "pin_replace": {
+    "stale_mode": "x",
+    "from": "x",
+    "until": "x"
+   },
+   "expect": {
+    "code": "invalid_pin",
+    "stage": "pin",
+    "field": "/stale_mode"
+   }
   }
  ],
  "steps": []
