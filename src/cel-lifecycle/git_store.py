@@ -100,6 +100,7 @@ class GitStore:
     def read(self,cursor=None):
         root=self.root()
         if cursor is None: cursor=root
+        if not isinstance(cursor,str): raise Fault('unknown_cursor','cursor is not in accepted history','store')
         if cursor:
             if not re.fullmatch('[0-9a-f]{40}',cursor) or cursor not in self.history(root):
                 raise Fault('unknown_cursor','cursor is not in accepted history','store')

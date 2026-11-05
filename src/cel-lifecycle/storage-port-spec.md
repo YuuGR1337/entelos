@@ -24,6 +24,7 @@ The vectors are language-neutral. A harness in a different language, for example
 - Input: an optional cursor. If the cursor is absent, the store uses the current cursor.
 - Output: a read view with `cursor` and `state`.
 - If the cursor is `""`, the view has the empty state. This is true also after later publications.
+- If the cursor is not a string, the operation fails with `unknown_cursor`.
 - If the cursor is not `""` and not in the accepted history of the current cursor, the operation fails with `unknown_cursor`.
 - Each call returns a new view. A change to a view does not change the store or a different view.
 

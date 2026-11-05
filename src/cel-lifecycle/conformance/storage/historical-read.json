@@ -1,7 +1,7 @@
 {
  "format": "storage-port-vector/v1",
  "id": "historical-read",
- "description": "A read at an old cursor returns the state and content of that cursor only. An unknown cursor fails.",
+ "description": "A read at an old cursor returns the state and content of that cursor only. An unknown cursor or a cursor that is not a string fails.",
  "invariants": [
   "stable_historical_read",
   "immutable_content_identity"
@@ -214,6 +214,34 @@
   {
    "op": "read",
    "cursor": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+   "expect": {
+    "error": "unknown_cursor"
+   }
+  },
+  {
+   "op": "read",
+   "cursor": 0,
+   "expect": {
+    "error": "unknown_cursor"
+   }
+  },
+  {
+   "op": "read",
+   "cursor": false,
+   "expect": {
+    "error": "unknown_cursor"
+   }
+  },
+  {
+   "op": "read",
+   "cursor": 5,
+   "expect": {
+    "error": "unknown_cursor"
+   }
+  },
+  {
+   "op": "read",
+   "cursor": [],
    "expect": {
     "error": "unknown_cursor"
    }

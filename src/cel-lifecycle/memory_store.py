@@ -21,9 +21,9 @@ class MemoryStore:
         return result
     def read(self,cursor=None):
         if cursor is None:cursor=self.root()
-        if not cursor:return View(self,'',empty_state(),{},{})
-        if not isinstance(cursor,str) or cursor not in self.revisions:
+        if not isinstance(cursor,str) or (cursor and cursor not in self.revisions):
             raise Fault('unknown_cursor','cursor is not in accepted history','store')
+        if not cursor:return View(self,'',empty_state(),{},{})
         _,state,entries=self.revisions[cursor]
         # Decode a new copy, so that a change to a view cannot change an accepted revision.
         return View(self,cursor,decode(state),dict(entries),{})

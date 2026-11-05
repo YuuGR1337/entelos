@@ -94,7 +94,7 @@
   "src/cel-lifecycle/conformance/storage/empty-store.json": "efc93147c46b147749b7713d3cf64ffa3a9bcf9cb9b9308fdc558486022b4208",
   "src/cel-lifecycle/conformance/storage/failed-publication.json": "9910c23023c89b3f4817db5c287d2e6fd393928552ad82894cdd2e5fdc5c5ad0",
   "src/cel-lifecycle/conformance/storage/first-publication.json": "e11565d1faa21e1e4d915346c656d836c0c796c4dd589ad68cd6aed2ea368c5d",
-  "src/cel-lifecycle/conformance/storage/historical-read.json": "fa64b96c8d12afc2712cec3c28c2450a6c5d8adef4b76754d49711a72abc698c",
+  "src/cel-lifecycle/conformance/storage/historical-read.json": "879757698f570735418264189cc416161361c53d156333c18081af46ce2fb39e",
   "src/cel-lifecycle/conformance/storage/idempotency-conflict.json": "9e9b427abf0e39ff9ba42176f8da0b8bca6185dfd3187dc2bc28da7f4c4f42d7",
   "src/cel-lifecycle/conformance/storage/idempotent-retry.json": "1d0f69871e6419278b8d77e283a4dbfe9cc65f63319dc3499d8244d4bb2cef17",
   "src/cel-lifecycle/conformance/storage/lost-cas-during-apply.json": "badb341c5dd31f0e70ca9e44e34b891bffe2e421f53d953bcc9983ce1bcc8136",
@@ -102,11 +102,11 @@
   "src/cel-lifecycle/conformance/storage/request-key-bounds.json": "d9e939cf8d24c09d0c50d6e52388dad49250f4177ed451a8cd88c16f36982f98",
   "src/cel-lifecycle/conformance/storage/stale-cas-rejected.json": "587948a5fe31a62db6199f0690060f4ce2b730478f2c0aa78a486704c6e51c89",
   "src/cel-lifecycle/fixtures/lifecycle-scenario.json": "78e266f7c37858498ccdd2d1de4736a6e5860ea422c4f8c20af30f67693a3866",
-  "src/cel-lifecycle/git_store.py": "7497157ca39f27b8eac51051ee69e1320b2d086cfce8f47ff5f892800a96f32c",
+  "src/cel-lifecycle/git_store.py": "5346bd63f2a6bc6e217730aa0eb112dd405fb589d25e384b8cd4ffc1e586b807",
   "src/cel-lifecycle/lifecycle.py": "f5584149efb10cb19af834b52ec00d7709db75ef20e65e35fcb8b717d481441c",
-  "src/cel-lifecycle/memory_store.py": "61b3f7daf3e7999d6e8d8f01d83292a87447b92a20d820adaa1cd639f21e1c86",
+  "src/cel-lifecycle/memory_store.py": "ee46fe4ceb8c90e2e5948eba4cf04e0f74902877ba48101dd6e143ae1a938f99",
   "src/cel-lifecycle/scenario.py": "7b3ed1d163dc37a0eb7b68e7364854cb821e9cb6aa7d9a63b6cad99961dae6f6",
-  "src/cel-lifecycle/storage-port-spec.md": "54ccc0ea9c08374d6d2a7bdfbc90d62ed4eff0c480d2ad36bb99726ed530a42b",
+  "src/cel-lifecycle/storage-port-spec.md": "dac257b848c67b05b9399b9434cb08340d5915c7de8ca8557dbc8454b420e598",
   "src/cel-lifecycle/storage-port.md": "216e390542c03a49f77b82967031afbba825bc50d2f43d051ae63cc7ffd94c6c",
   "src/cel-lifecycle/test_lifecycle.py": "80490c2cf12c724dcdb9696511e2c32b89b244c51cd9e4c6e3cff05560856ff4",
   "src/cel-lifecycle/test_storage_port.py": "c1327f93a42d3aa29cb04a6207ce64d5d2ffa31f83c483ded3ad563be5f190d9",
@@ -115,5 +115,5 @@
   "tools/classify_change.py": "be24b68b179d2a45189a0a1b55dde0cd8df73d9004fd1ec53ffccc26ab7b7d2c",
   "tools/cross_review.py": "b69f65ccc0051a7fd9b8e2c7f9fbb3673b8ad49b0e06123c88678cd3a8d76bac",
   "tools/pr_policy.py": "ac1312b707d39dd7a8c6431724c1a5f424cce70f7a708ecacc6760274769fc7d",
-  "verify.py": "f1df471a4e99e041c332df3abeff02874097fb07cb53fd36721e9f105165d245"
+  "verify.py": "5e2b47f8714e3d4a365052dd0d5e97f26a419c5f166a55df34dec45ac141937c"
 }
