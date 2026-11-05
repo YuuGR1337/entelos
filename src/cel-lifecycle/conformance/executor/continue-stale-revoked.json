@@ -1,0 +1,93 @@
+{
+ "format": "executor-vector/v1",
+ "id": "continue-stale-revoked",
+ "description": "A revoked continue_stale pin answers and marks the entry revoked in the interval and expired at or after until.",
+ "bundle": {
+  "function_id": "record.visible",
+  "profile": "cel-string-bool/v1",
+  "caller_variables": [
+   "state",
+   "archived"
+  ],
+  "limits": {
+   "max_request_bytes": 4096,
+   "max_string_utf8_bytes": 256,
+   "max_source_utf8_bytes": 4096,
+   "parser_recursion_limit": 64,
+   "evaluation_cost_limit": 1000
+  },
+  "environment": {
+   "name": "record-filter",
+   "variables": [
+    {
+     "name": "state",
+     "type": "string",
+     "description": "The record state supplied by the caller."
+    },
+    {
+     "name": "archived",
+     "type": "bool",
+     "description": "Whether the caller record is archived."
+    },
+    {
+     "name": "allowed_state",
+     "type": "string",
+     "description": "The fixed allowed state."
+    }
+   ]
+  },
+  "source": "state == allowed_state && !archived\n",
+  "fixed": {
+   "allowed_state": "ready"
+  }
+ },
+ "pin": {
+  "function": "record.visible",
+  "scope": "tenant-example",
+  "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "from": "2026-11-01",
+  "until": "2026-12-01",
+  "stale_mode": "continue_stale",
+  "revoked": true
+ },
+ "steps": [
+  {
+   "name": "revoked",
+   "cursor": 1,
+   "date": "2026-11-15",
+   "inputs_json": "{\"state\": \"closed\", \"archived\": false}",
+   "expect": {
+    "entry": {
+     "cursor": 1,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-11-15",
+     "inputs_ref": "sha256:769c9068dee945edc52f152d98e488b6a01d4ed1eaf6dc6aef7b646d856870e9",
+     "stale_reason": "revoked",
+     "response": {
+      "status": "ok",
+      "value": false
+     }
+    }
+   }
+  },
+  {
+   "name": "expired-and-revoked",
+   "cursor": 2,
+   "date": "2026-12-01",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": false}",
+   "expect": {
+    "entry": {
+     "cursor": 2,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-12-01",
+     "inputs_ref": "sha256:5ef0eedcaa5458c104b7af465f065430a1218d71e38db59754b346c317f5fce2",
+     "stale_reason": "expired",
+     "response": {
+      "status": "ok",
+      "value": true
+     }
+    }
+   }
+  }
+ ]
+}

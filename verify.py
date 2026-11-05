@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Build public pinned tools and run this source-only reference in an external work directory."""
 import argparse
+import gzip
 import hashlib
 import json
 import os
+import re
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -35,11 +38,11 @@ commands=[];checks=[];start=time.monotonic()
 def inventory():
  return {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(ROOT.rglob('*')) if p.is_file()}
 def write(path,value):path.write_text(json.dumps(value,indent=2,ensure_ascii=False)+'\n')
-def run(name,args,cwd=ROOT):
+def run(name,args,cwd=ROOT,extra=None):
  # Each stage prints one progress line to stderr. Stdout keeps only the final summary JSON.
  print('verify: %4ds start %s'%(time.monotonic()-start,name),file=sys.stderr,flush=True)
- result=subprocess.run([str(x) for x in args],cwd=cwd,env=env,capture_output=True,text=True)
- record={'name':name,'args':[str(x) for x in args],'cwd':str(cwd),'exit_code':result.returncode,'stdout':result.stdout,'stderr':result.stderr}
+ result=subprocess.run([str(x) for x in args],cwd=cwd,env=env|(extra or {}),capture_output=True,text=True)
+ record={'name':name,'args':[str(x) for x in args],'cwd':str(cwd),'env':extra or {},'exit_code':result.returncode,'stdout':result.stdout,'stderr':result.stderr}
  commands.append(record);write(w/'runs'/(name+'.json'),record);return result
 def check(name,question,passed,actual):
  checks.append({'name':name,'question':question,'passed':bool(passed),'actual':actual})
@@ -68,7 +71,8 @@ try:
  identity=run('host-identity',[w/'bin/cel-handoff','-build']);host_build=json.loads(identity.stdout)
  deps={x['Path']:x['Version'] for x in host_build['build']['Deps']}
  check('engine-pins','Does the actual host use the pinned CEL engine/expressions?',deps.get('cel.dev/cel-go')=='v0.32.0' and deps.get('cel.dev/expr')=='v0.25.3',host_build)
- go_tests=run('go-tests',['go','test','-mod=readonly','-count=1','-json','./...'],ROOT/'src/cel-handoff')
+ (w/'executor').mkdir(parents=True,exist_ok=True)
+ go_tests=run('go-tests',['go','test','-mod=readonly','-count=1','-json','./...'],ROOT/'src/cel-handoff',{'EXECUTOR_VECTOR_RESULTS':str(w/'executor/native.json')})
  check('go-contracts','Do the exported Go contract tests pass?',go_tests.returncode==0,{'exit_code':go_tests.returncode})
  vet=run('go-vet',['go','vet','-mod=readonly','./...'],ROOT/'src/cel-handoff')
  check('go-vet','Does Go static analysis pass?',vet.returncode==0,{'exit_code':vet.returncode})
@@ -94,6 +98,56 @@ try:
        scenario.get('status')=='passed' and bool(scenario.get('checks')) and all(x['passed'] for x in scenario['checks']) and len(go_core)==3 and all(x.returncode==0 for x in go_core),
        {'stages':{c['name']:c['exit_code'] for c in commands if c['name'].startswith('go-core-')},
         'scenario':{k:scenario.get(k) for k in ['status','error','steps']}|{'checks':[x['name'] for x in scenario.get('checks',[]) if x.get('passed')]}})
+ # The browser executor (decision 0002) is the same command built for js/wasm. In a browser the module serves the
+ # JavaScript bridge; under Node with arguments it serves the command line, so the Host can qualify with the exact module.
+ # Qualification is for each build: the WASM build has its own implementation_ref.
+ handoff=ROOT/'src/cel-handoff';node=shutil.which('node');goroot=run('go-root',['go','env','GOROOT']).stdout.strip()
+ node_version=run('node-version',[node,'--version']).stdout.strip() if node else None
+ check('node','Is Node available to run the WebAssembly module?',node is not None and goroot!='',{'node':node,'version':node_version,'goroot':goroot})
+ wasm_env={'GOOS':'js','GOARCH':'wasm'};lib=Path(goroot)/'lib/wasm';module=w/'bin/cel-handoff.wasm'
+ wasm_stages=[run('build-wasm',['go','build','-mod=readonly','-trimpath','-buildvcs=false','-o',module,'./cmd/cel-handoff'],handoff,wasm_env)]
+ # The Go launcher copies the whole environment into the module, and the module has a size limit for arguments and
+ # environment. Thus each wrapper starts Node with an empty environment. The test wrapper keeps only the results path.
+ wrapper=w/'bin/cel-handoff-wasm';wrapper.write_text('#!/bin/sh\nexec /usr/bin/env -i "%s" "%s" "%s" "$@"\n'%(node,lib/'wasm_exec_node.js',module));wrapper.chmod(0o755)
+ test_exec=w/'bin/go-wasm-exec';test_exec.write_text('#!/bin/sh\nexec /usr/bin/env -i EXECUTOR_VECTOR_RESULTS="$EXECUTOR_VECTOR_RESULTS" "%s" "%s" "$@"\n'%(node,lib/'wasm_exec_node.js'));test_exec.chmod(0o755)
+ wasm_identity=run('wasm-identity',[wrapper,'-build']);wasm_build=json.loads(wasm_identity.stdout) if wasm_identity.returncode==0 else {}
+ wasm_deps={x['Path']:x['Version'] for x in wasm_build.get('build',{}).get('Deps',[])}
+ check('wasm-identity','Does the WASM module use the pinned CEL engine and have its own build identity?',
+       wasm_stages[0].returncode==0 and wasm_deps.get('cel.dev/cel-go')=='v0.32.0' and wasm_deps.get('cel.dev/expr')=='v0.25.3'
+       and wasm_build.get('implementation_ref','') not in ('',host_build['implementation_ref']),
+       {'implementation_ref':wasm_build.get('implementation_ref'),'native_implementation_ref':host_build['implementation_ref'],'deps':wasm_deps})
+ wasm_stages.append(run('go-tests-wasm',['go','test','-mod=readonly','-count=1','-exec',test_exec,'.'],handoff,wasm_env|{'EXECUTOR_VECTOR_RESULTS':str(w/'executor/wasm-test.json')}))
+ wasm_stages.append(run('go-vet-wasm',['go','vet','-mod=readonly','./...'],handoff,wasm_env))
+ wasm_stages.append(run('bridge-vectors',[node,handoff/'web/node-check.mjs',module,lib/'wasm_exec.js',ROOT/'src/cel-lifecycle/conformance/executor',w/'executor/bridge.json']))
+ def executor_results(name):
+  path=w/'executor'/name
+  if not path.exists():return None,None
+  d=json.loads(path.read_text());text=json.dumps(d.get('vectors'),sort_keys=True)
+  if not d.get('implementation_ref') or d.get('vectors') is None:return d,None
+  text=text.replace(d['implementation_ref'],'<build>')
+  text=re.sub(r'"bundle_ref": "sha256:[0-9a-f]{64}"','"bundle_ref": "<bundle>"',text)
+  return d,[{k:v for k,v in r.items() if v is not None} for x in json.loads(text).values() for r in x]
+ native,native_steps=executor_results('native.json');test,test_steps=executor_results('wasm-test.json');bridge,bridge_steps=executor_results('bridge.json')
+ raw=module.read_bytes() if module.exists() else b''
+ size={'module_bytes':len(raw),'gzip_9_bytes':len(gzip.compress(raw,9,mtime=0)),'module_sha256':hashlib.sha256(raw).hexdigest(),
+       'node_cold_start_ms':(bridge or {}).get('host',{}).get('cold_start_ms'),'node_version':node_version}
+ check('wasm-executor','Do the executor vectors pass on the native build, as WASM under Node and through the bridge, with the same entries except the build and bundle identities?',
+       all(x.returncode==0 for x in wasm_stages) and go_tests.returncode==0 and native_steps is not None and bool(native_steps)
+       and native_steps==test_steps==bridge_steps and (bridge or {}).get('errors')==[] and (bridge or {}).get('implementation_ref')==wasm_build.get('implementation_ref'),
+       {'stages':{c['name']:c['exit_code'] for c in commands if c['name'] in ('build-wasm','go-tests-wasm','go-vet-wasm','bridge-vectors')},
+        'steps':len(native_steps or []),'bridge_errors':(bridge or {}).get('errors'),'measurements':size})
+ # The Go lifecycle scenario again, with the WASM module as the engine. Each snapshot then pins the WASM build.
+ wasm_bundle=w/'record-bundle-wasm';wasm_scenario=w/'go-core-wasm/scenario-results.json';wasm_scenario.parent.mkdir(parents=True,exist_ok=True)
+ wasm_prepared=run('prepare-record-wasm',[sys.executable,'-B',handoff/'tools/prepare.py','--bundle',wasm_bundle,'--binary',wrapper])
+ wasm_core=run('go-core-scenario-wasm',['go','test','-mod=readonly','-count=1','-run','^TestLifecycleScenario$','.'],core,
+               {'LIFECYCLE_CEL_BINARY':str(wrapper),'LIFECYCLE_CEL_BUNDLE':str(wasm_bundle),'LIFECYCLE_SCENARIO_RESULTS':str(wasm_scenario)})
+ wasm_result=json.loads(wasm_scenario.read_text()) if wasm_scenario.exists() else {'status':'failed','error':'the WASM scenario wrote no results'}
+ wasm_manifest=json.loads((wasm_bundle/'manifest.json').read_text()) if (wasm_bundle/'manifest.json').exists() else {}
+ check('wasm-qualification','Does the Host qualify, activate, invoke, replay and restate with the WASM module as the engine?',
+       wasm_prepared.returncode==0 and wasm_core.returncode==0 and wasm_result.get('status')=='passed' and bool(wasm_result.get('checks'))
+       and all(x['passed'] for x in wasm_result['checks']) and wasm_manifest.get('implementation_ref')==wasm_build.get('implementation_ref'),
+       {'exit_code':wasm_core.returncode,'status':wasm_result.get('status'),'error':wasm_result.get('error'),'steps':wasm_result.get('steps'),
+        'bundle_implementation_ref':wasm_manifest.get('implementation_ref'),'checks':[x['name'] for x in wasm_result.get('checks',[]) if x.get('passed')]})
  # The Go sidecar runs the session vector files through its Unix socket. Its stub Host and schema table tests are in go-core-tests.
  sidecar=[run('build-sidecar',['go','build','-mod=readonly','-trimpath','-buildvcs=false','-o',w/'bin/entelos-sidecar','./cmd/entelos-sidecar'],core)]
  if sidecar[0].returncode==0:

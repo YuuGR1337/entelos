@@ -38,6 +38,12 @@ func readBound(path string) ([]byte, error) {
 	return raw, err
 }
 func main() {
+	// A WebAssembly module in a browser has no arguments. It serves the
+	// JavaScript bridge instead of the command line. See bridge_js.go.
+	if bridgeMode() {
+		serveBridge()
+		return
+	}
 	dir := flag.String("bundle", "", "host-selected directory with manifest.json, env.json, rule.cel, fixed.json")
 	casesPath := flag.String("cases", "", "host-owned check cases JSON array")
 	build := flag.Bool("build", false, "print actual implementation identity and dependency build data")
@@ -52,12 +58,16 @@ func main() {
 		os.Exit(2)
 	}
 	var f h.Files
-	for name, dst := range map[string]*[]byte{"manifest.json": &f.Manifest, "env.json": &f.Environment, "rule.cel": &f.Source, "fixed.json": &f.Fixed} {
-		raw, err := readBound(filepath.Join(*dir, name))
+	// A fixed order gives one diagnostic for one bundle directory.
+	for _, file := range []struct {
+		name string
+		dst  *[]byte
+	}{{"manifest.json", &f.Manifest}, {"env.json", &f.Environment}, {"rule.cel", &f.Source}, {"fixed.json", &f.Fixed}} {
+		raw, err := readBound(filepath.Join(*dir, file.name))
 		if err != nil {
-			fail(&h.Diagnostic{Code: "artifact_unavailable", Stage: "bundle", Field: "/" + name, Message: err.Error()})
+			fail(&h.Diagnostic{Code: "artifact_unavailable", Stage: "bundle", Field: "/" + file.name, Message: err.Error()})
 		}
-		*dst = raw
+		*file.dst = raw
 	}
 	b, d := h.Load(f)
 	if d != nil {
