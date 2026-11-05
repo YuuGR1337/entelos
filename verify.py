@@ -82,6 +82,19 @@ try:
  tests=run('lifecycle-tests',[sys.executable,'-B',ROOT/'src/cel-lifecycle/test_lifecycle.py'])
  test_results=json.loads((w/'conformance/test-results.json').read_text())
  check('lifecycle','Do local lifecycle/concurrency/recovery/replay checks pass from the export alone?',tests.returncode==0 and test_results['successful'],test_results)
+ core=ROOT/'src/lifecycle-core'
+ go_core=[run('go-core-build',['go','build','-mod=readonly','-trimpath','-buildvcs=false','-o',w/'bin/lifecycle-core','./cmd/lifecycle-core'],core)]
+ if go_core[0].returncode==0:
+  go_core.append(run('go-core-parity',[sys.executable,'-B',core/'tools/parity.py','--work',w/'go-core','--runtime',w/'bin/cel-handoff','--bundle',w/'record-bundle','--fixture',env['LIFECYCLE_FIXTURE'],'--host',w/'bin/lifecycle-core']))
+ parity_path=w/'go-core/parity.json';parity=json.loads(parity_path.read_text()) if parity_path.exists() else {'status':'failed'}
+ if parity['status']=='passed':
+  env.update(LIFECYCLE_GO_BASELINE=str(parity_path),LIFECYCLE_GO_REQUIRE_BASELINE='1')
+  go_core.append(run('go-core-tests',['go','test','-mod=readonly','-count=1','./...'],core))
+  go_core.append(run('go-core-vet',['go','vet','-mod=readonly','./...'],core))
+ check('go-lifecycle-core','Does the Go lifecycle core build, match the Python core on the scenario, and pass its tests and vet?',
+       len(go_core)==4 and all(x.returncode==0 for x in go_core),
+       {'stages':{c['name']:c['exit_code'] for c in commands[-len(go_core):]},
+        'parity':{k:parity.get(k) for k in ['status','steps','first_difference','same_snapshot_refs']}})
  demo=run('consumer-reuse',[sys.executable,'-B',ROOT/'examples/ci-trigger/run.py','--work',w/'reuse','--cel-binary',w/'bin/cel-handoff','--author-binary',w/'bin/cel-expr','--record-bundle',w/'record-bundle'])
  reuse=json.loads((w/'reuse/results.json').read_text())
  check('two-consumers-and-baseline','Do both consumer loops and the ordinary-code comparison pass?',demo.returncode==0 and reuse['status']=='passed',{'status':reuse['status'],'checks':reuse['checks'],'measurements':reuse['measurements'],'errors':reuse['errors']})
