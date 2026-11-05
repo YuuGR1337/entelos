@@ -10,6 +10,7 @@ This module is a Go port of the reference lifecycle Host in `src/cel-lifecycle/`
 - `memstore.go`: an in-memory adapter with the same publication contract. It is not durable.
 - `canon.go`: the record codec. It gives the same bytes as the Python codec.
 - `runtime.go`: the CEL adapter. It calls the pinned `cel-handoff` executable, the same as the Python core.
+- `runner.go`: the qualification runner contract. [RUNNER.md](RUNNER.md) is the spec. `CELRunner` is the first runner.
 - `cmd/lifecycle-core`: the JSONL host. It has the same arguments and wire form as `cli.py`.
 - `protocol/`: the wire protocol 1.0 of [PROTOCOL.md](../protocol/PROTOCOL.md) in front of the Host: frames, the RFC 8785 encoder, the schema validator and the Unix socket listener.
 - `cmd/entelos-sidecar`: the local sidecar ([#84](https://github.com/mohanraj00/entelos/issues/84)). It serves the protocol on a Unix domain socket.
