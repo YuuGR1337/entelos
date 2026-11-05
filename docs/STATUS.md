@@ -96,7 +96,7 @@ These are the limits of the M4 result:
 
 ### M6 Store-neutral core and versioned protocol
 
-On 2026-11-05, the maintainer approved the M6 scope in issue #77. The technology decision (#85) comes first, and the maintainer makes it. The protocol (#83) and the sidecar (#84) wait for that decision. The specs and vectors for #78 to #81 are language-neutral.
+On 2026-11-05, the maintainer approved the M6 scope in issue #77. Decision [0002](decisions/0002-browser-executor.md) adds a browser executor (#93): the Go executor compiled to WASM, for web delivery with no install. The specs and vectors for #78 to #81 are language-neutral.
 
 On 2026-11-05, the maintainer accepted the [technology decision](decisions/0001-technology.md): Go for the core and the sidecar, JSON with RFC 8785 digests on a Unix socket, and a gomobile executor package for native Swift and Kotlin apps.
 
