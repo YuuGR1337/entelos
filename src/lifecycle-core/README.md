@@ -48,6 +48,7 @@ entelos-sidecar --socket <path> --repo <store.git> --context <context.json> --ru
 - The sidecar reads the schemas from `--schema` at start. If an operation schema does not agree with the Host read operations, the sidecar does not start.
 - The socket file has mode 0600. The umask is 0177 while the sidecar makes the socket, so the mode is 0600 from the start.
 - If the socket path exists, the sidecar removes it only if it is a stale socket: a socket file with no listener. If the path is another file type or a socket with a listener, the sidecar does not start.
+- The sidecar holds an exclusive lock on `<path>.lock` (mode 0600) during the stale check, the removal and the bind. Two sidecars that start at the same path cannot remove each other's live socket. The lock file stays.
 - The socket path has a maximum of 103 bytes, the `sun_path` limit of macOS. For a longer directory, start the sidecar in the socket directory and give a relative path.
 - When the socket listens, the sidecar writes one line to stdout: `{"socket":"<path>","status":"listening"}`.
 - Each connection has its own goroutine. The Host gets one request at a time.

@@ -254,3 +254,49 @@ func TestShutdownKeepsReplacementSocket(t *testing.T) {
 		t.Fatalf("Shutdown removed the replacement socket: %v", err)
 	}
 }
+
+// Many sidecars start at one stale socket at the same time. Only one of them
+// binds, and its socket stays live.
+func TestConcurrentListenAtStaleSocket(t *testing.T) {
+	inTempDir(t)
+	stale, err := net.ListenUnix("unix", &net.UnixAddr{Name: sock, Net: "unix"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale.SetUnlinkOnClose(false)
+	stale.Close()
+	const n = 8
+	results := make(chan *net.UnixListener, n)
+	start := make(chan struct{})
+	for i := 0; i < n; i++ {
+		go func() {
+			<-start
+			l, err := Listen(sock)
+			if err != nil {
+				l = nil
+			}
+			results <- l
+		}()
+	}
+	close(start)
+	var live []*net.UnixListener
+	for i := 0; i < n; i++ {
+		if l := <-results; l != nil {
+			live = append(live, l)
+		}
+	}
+	for _, l := range live {
+		defer l.Close()
+	}
+	if len(live) != 1 {
+		t.Fatalf("%d listeners bound the path, want 1", len(live))
+	}
+	conn, err := net.Dial("unix", sock)
+	if err != nil {
+		t.Fatalf("the bound socket is not live: %v", err)
+	}
+	conn.Close()
+	if info, err := os.Lstat(sock + ".lock"); err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("lock file: %v %v", info, err)
+	}
+}

@@ -21,10 +21,27 @@ const MaxSocketPath = 103
 // Listen makes a Unix domain socket at path with file mode 0600. If the path
 // exists, Listen removes it only if it is a stale socket: a socket file with
 // no listener. Listen refuses any other file and a socket with a listener.
+//
+// Listen holds an exclusive lock on the file path+".lock" during the stale
+// check, the removal and the bind. Thus two sidecars that start at the same
+// time cannot both see one stale socket, and the second one cannot remove
+// the live socket of the first one. The lock file stays after Listen.
 func Listen(path string) (*net.UnixListener, error) {
 	if len(path) > MaxSocketPath {
 		return nil, fmt.Errorf("socket path is longer than %d bytes: start the sidecar in the socket directory and give a relative path", MaxSocketPath)
 	}
+	lock, err := os.OpenFile(path+".lock", os.O_RDWR|os.O_CREATE|syscall.O_NOFOLLOW, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		return nil, err
+	}
+	return listenLocked(path)
+}
+
+func listenLocked(path string) (*net.UnixListener, error) {
 	info, err := os.Lstat(path)
 	switch {
 	case err == nil && info.Mode().Type() != fs.ModeSocket:
