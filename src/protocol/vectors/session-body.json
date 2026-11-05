@@ -1,0 +1,364 @@
+{
+ "description": "Body schema rules. Each failure comes from the protocol stage, before the Host.",
+ "context": {
+  "actor": "reviewer-a",
+  "roles": [
+   "reviewer",
+   "author",
+   "runner",
+   "worker",
+   "caller",
+   "reader",
+   "observer"
+  ],
+  "scope": "tenant-example",
+  "runner_actor": "fixture-runner",
+  "worker": "local-worker",
+  "functions": [
+   "record.visible"
+  ]
+ },
+ "steps": [
+  {
+   "name": "missing-field",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-1",
+    "operation": "source",
+    "body": {
+     "function": "record.visible",
+     "from": "2026-11-01",
+     "until": "2026-12-01",
+     "reason": "initial rule",
+     "expected_revision": "",
+     "request_key": "k-1"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-1",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "wrong-type-string",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-2",
+    "operation": "source",
+    "body": {
+     "function": "record.visible",
+     "from": "2026-11-01",
+     "until": "2026-12-01",
+     "text": 5,
+     "reason": "initial rule",
+     "expected_revision": "",
+     "request_key": "k-1"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-2",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "wrong-type-object",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-3",
+    "operation": "propose",
+    "body": {
+     "function": "record.visible",
+     "from": "2026-11-01",
+     "until": "2026-12-01",
+     "base_snapshot": "",
+     "source_ref": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+     "bundle": "files",
+     "reason": "r",
+     "expected_revision": "",
+     "request_key": "k-1"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-3",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "bool-is-not-string",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-4",
+    "operation": "describe",
+    "body": {
+     "function": true,
+     "date": "2026-11-15"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-4",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "unexpected-body-field",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-5",
+    "operation": "inspect",
+    "body": {
+     "extra": ""
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-5",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "write-without-revision",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-6",
+    "operation": "source",
+    "body": {
+     "function": "record.visible",
+     "from": "2026-11-01",
+     "until": "2026-12-01",
+     "text": "Archived records are not visible.",
+     "reason": "initial rule",
+     "request_key": "k-1"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-6",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "read-with-write-field",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-7",
+    "operation": "inspect",
+    "body": {
+     "request_key": "k-1"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-7",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "reference-pattern",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-8",
+    "operation": "record",
+    "body": {
+     "ref": "abc",
+     "kind": "source"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-8",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "date-pattern",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-9",
+    "operation": "describe",
+    "body": {
+     "function": "record.visible",
+     "date": "15 Nov 2026"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-9",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "enum-value",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-10",
+    "operation": "observe",
+    "body": {
+     "receipt_ref": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+     "route": "elsewhere",
+     "message": "",
+     "expected_revision": "",
+     "request_key": "k-1"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-10",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "request-key-too-long",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-11",
+    "operation": "source",
+    "body": {
+     "function": "record.visible",
+     "from": "2026-11-01",
+     "until": "2026-12-01",
+     "text": "Archived records are not visible.",
+     "reason": "initial rule",
+     "expected_revision": "",
+     "request_key": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-11",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "empty-cases",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-12",
+    "operation": "plan",
+    "body": {
+     "source_ref": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+     "cases": [],
+     "origin": "hand-written",
+     "expected_revision": "",
+     "request_key": "k-1"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-12",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  }
+ ]
+}

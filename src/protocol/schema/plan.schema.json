@@ -1,0 +1,82 @@
+{
+ "$defs": {
+  "request_body": {
+   "additionalProperties": false,
+   "properties": {
+    "cases": {
+     "items": {
+      "type": "object"
+     },
+     "minItems": 1,
+     "type": "array"
+    },
+    "expected_revision": {
+     "type": "string"
+    },
+    "origin": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "request_key": {
+     "maxLength": 128,
+     "minLength": 1,
+     "type": "string"
+    },
+    "source_ref": {
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "supersedes": {
+     "items": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "cases",
+    "expected_revision",
+    "origin",
+    "request_key",
+    "source_ref"
+   ],
+   "type": "object"
+  },
+  "result": {
+   "additionalProperties": false,
+   "properties": {
+    "cursor": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "result": {
+     "additionalProperties": false,
+     "properties": {
+      "plan_ref": {
+       "pattern": "^sha256:[0-9a-f]{64}$",
+       "type": "string"
+      }
+     },
+     "required": [
+      "plan_ref"
+     ],
+     "type": "object"
+    },
+    "reused": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "cursor",
+    "result",
+    "reused"
+   ],
+   "type": "object"
+  }
+ },
+ "$id": "https://github.com/mohanraj00/entelos/blob/main/src/protocol/schema/plan.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "plan",
+ "x-entelos-access": "write"
+}

@@ -1,0 +1,86 @@
+{
+ "$defs": {
+  "request_body": {
+   "additionalProperties": false,
+   "properties": {
+    "cursor": {
+     "type": "string"
+    },
+    "date": {
+     "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+     "type": "string"
+    },
+    "function": {
+     "minLength": 1,
+     "type": "string"
+    }
+   },
+   "required": [
+    "date",
+    "function"
+   ],
+   "type": "object"
+  },
+  "result": {
+   "additionalProperties": false,
+   "properties": {
+    "bundle_ref": {
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "date": {
+     "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+     "type": "string"
+    },
+    "decision_ref": {
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "engine_build": {
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "event_ref": {
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "function": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "registry_cursor": {
+     "type": "string"
+    },
+    "report_ref": {
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "scope": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "snapshot_ref": {
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    }
+   },
+   "required": [
+    "function",
+    "scope",
+    "date",
+    "registry_cursor",
+    "event_ref",
+    "snapshot_ref",
+    "bundle_ref",
+    "engine_build",
+    "report_ref",
+    "decision_ref"
+   ],
+   "type": "object"
+  }
+ },
+ "$id": "https://github.com/mohanraj00/entelos/blob/main/src/protocol/schema/resolve.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "resolve",
+ "x-entelos-access": "read"
+}
