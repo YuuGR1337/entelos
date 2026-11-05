@@ -1,0 +1,160 @@
+{
+ "format": "storage-port-vector/v1",
+ "id": "idempotent-retry",
+ "description": "A retry with the same key and payload returns the original cursor and result. It does not run apply or publish.",
+ "invariants": [
+  "idempotent_success"
+ ],
+ "steps": [
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "key-1",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 1
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [],
+    "result": {
+     "n": 1
+    }
+   },
+   "expect": {
+    "reused": false,
+    "result": {
+     "n": 1
+    },
+    "apply_calls": 1,
+    "bind": "c1"
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "$c1",
+   "key": "key-2",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 2
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [],
+    "result": {
+     "n": 2
+    }
+   },
+   "expect": {
+    "reused": false,
+    "result": {
+     "n": 2
+    },
+    "apply_calls": 1,
+    "bind": "c2"
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "key-1",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 1
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [
+     {
+      "raise": "apply_must_not_run"
+     }
+    ],
+    "result": {
+     "n": 9
+    }
+   },
+   "expect": {
+    "reused": true,
+    "result": {
+     "n": 1
+    },
+    "apply_calls": 0,
+    "cursor": "$c1"
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "$c2",
+   "key": "key-1",
+   "payload": {
+    "actor": "actor-a",
+    "request": {
+     "value": 1,
+     "op": "example.write"
+    }
+   },
+   "apply": {
+    "actions": [],
+    "result": {
+     "n": 9
+    }
+   },
+   "expect": {
+    "reused": true,
+    "result": {
+     "n": 1
+    },
+    "apply_calls": 0,
+    "cursor": "$c1"
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "$c1",
+   "key": "key-2",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 2
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [],
+    "result": {
+     "n": 9
+    }
+   },
+   "expect": {
+    "reused": true,
+    "result": {
+     "n": 2
+    },
+    "apply_calls": 0,
+    "cursor": "$c2"
+   }
+  },
+  {
+   "op": "read",
+   "expect": {
+    "cursor": "$c2"
+   }
+  },
+  {
+   "op": "history",
+   "cursor": "$c2",
+   "expect": {
+    "cursors": [
+     "$c2",
+     "$c1"
+    ]
+   }
+  }
+ ]
+}

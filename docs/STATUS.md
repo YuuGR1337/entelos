@@ -100,6 +100,8 @@ On 2026-11-05, the maintainer approved the M6 scope in issue #77. Decision [0002
 
 On 2026-11-05, the maintainer accepted the [technology decision](decisions/0001-technology.md): Go for the core and the sidecar, JSON with RFC 8785 digests on a Unix socket, and a gomobile executor package for native Swift and Kotlin apps.
 
+Issue #79 adds a storage port spec, 11 JSON storage vectors and an in-memory adapter. The Git adapter and the in-memory adapter pass all vectors. `verify.py` runs them as the `storage-vectors` check. The vectors do not show durability or performance.
+
 Keep caller walkthrough and input-correction documentation bounded to the existing examples. Numeric/structured profiles, production DBs, authentication gateways and resident-worker coordination are outside the current implemented scope.
 
 ## Handoff rule

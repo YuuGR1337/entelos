@@ -1,0 +1,208 @@
+{
+ "format": "storage-port-vector/v1",
+ "id": "content-identity",
+ "description": "A content reference is the SHA-256 of the media type, a NUL byte and the exact bytes. Reads check type and shape.",
+ "invariants": [
+  "immutable_content_identity"
+ ],
+ "steps": [
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "key-1",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 1
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [
+     {
+      "put": "note",
+      "value": {
+       "note": "alpha",
+       "n": 1
+      },
+      "expect_ref": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6"
+     },
+     {
+      "put": "note",
+      "value": {
+       "note": "alpha",
+       "n": 1
+      },
+      "expect_ref": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6"
+     },
+     {
+      "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+      "kind": "note",
+      "expect": {
+       "value": {
+        "note": "alpha",
+        "n": 1
+       }
+      }
+     },
+     {
+      "put": "note",
+      "value": [
+       1,
+       2
+      ],
+      "expect_ref": "sha256:dd98392f7cc29f509c37b250d08a361e48768ab6f5b3547ac12b82a06a0cdda2"
+     },
+     {
+      "put_raw": "text/plain",
+      "text": "plain text\n",
+      "expect_ref": "sha256:b1e0946ca32b3d4139ae31b02767d06999fe01b6c74a8c368a33337881adf672"
+     },
+     {
+      "get_raw": "sha256:b1e0946ca32b3d4139ae31b02767d06999fe01b6c74a8c368a33337881adf672",
+      "mime": "text/plain",
+      "expect": {
+       "text": "plain text\n"
+      }
+     },
+     {
+      "get_raw": "sha256:b1e0946ca32b3d4139ae31b02767d06999fe01b6c74a8c368a33337881adf672",
+      "expect": {
+       "text": "plain text\n"
+      }
+     }
+    ],
+    "result": "stored"
+   },
+   "expect": {
+    "reused": false,
+    "result": "stored",
+    "apply_calls": 1,
+    "bind": "c1"
+   }
+  },
+  {
+   "op": "read",
+   "actions": [
+    {
+     "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+     "kind": "note",
+     "expect": {
+      "value": {
+       "note": "alpha",
+       "n": 1
+      }
+     }
+    },
+    {
+     "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+     "kind": "other",
+     "expect": {
+      "error": "invalid_record"
+     }
+    },
+    {
+     "get": "sha256:dd98392f7cc29f509c37b250d08a361e48768ab6f5b3547ac12b82a06a0cdda2",
+     "kind": "note",
+     "expect": {
+      "error": "invalid_record"
+     }
+    },
+    {
+     "get_raw": "sha256:b1e0946ca32b3d4139ae31b02767d06999fe01b6c74a8c368a33337881adf672",
+     "mime": "text/plain",
+     "expect": {
+      "text": "plain text\n"
+     }
+    },
+    {
+     "get_raw": "sha256:b1e0946ca32b3d4139ae31b02767d06999fe01b6c74a8c368a33337881adf672",
+     "mime": "text/other",
+     "expect": {
+      "error": "invalid_record"
+     }
+    },
+    {
+     "get": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+     "kind": "note",
+     "expect": {
+      "error": "artifact_unavailable"
+     }
+    },
+    {
+     "get": "sha256:xyz",
+     "kind": "note",
+     "expect": {
+      "error": "invalid_reference"
+     }
+    },
+    {
+     "get": "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+     "kind": "note",
+     "expect": {
+      "error": "invalid_reference"
+     }
+    },
+    {
+     "get": "md5:00000000000000000000000000000000",
+     "kind": "note",
+     "expect": {
+      "error": "invalid_reference"
+     }
+    }
+   ],
+   "expect": {
+    "cursor": "$c1"
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "$c1",
+   "key": "key-2",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 2
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [
+     {
+      "put": "note",
+      "value": {
+       "note": "alpha",
+       "n": 1
+      },
+      "expect_ref": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6"
+     }
+    ],
+    "result": "again"
+   },
+   "expect": {
+    "reused": false,
+    "result": "again",
+    "apply_calls": 1,
+    "bind": "c2"
+   }
+  },
+  {
+   "op": "read",
+   "actions": [
+    {
+     "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+     "kind": "note",
+     "expect": {
+      "value": {
+       "note": "alpha",
+       "n": 1
+      }
+     }
+    }
+   ],
+   "expect": {
+    "cursor": "$c2"
+   }
+  }
+ ]
+}

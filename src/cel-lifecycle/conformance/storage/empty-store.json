@@ -1,0 +1,54 @@
+{
+ "format": "storage-port-vector/v1",
+ "id": "empty-store",
+ "description": "A new store has the empty cursor, the empty state and no history.",
+ "invariants": [
+  "stable_historical_read"
+ ],
+ "steps": [
+  {
+   "op": "read",
+   "expect": {
+    "cursor": "",
+    "state": {
+     "schema": "local-lifecycle/v1",
+     "heads": {},
+     "sources": [],
+     "plans": [],
+     "events": [],
+     "requests": {},
+     "workers": {},
+     "receipts": [],
+     "tasks": {},
+     "outbox": {}
+    }
+   }
+  },
+  {
+   "op": "read",
+   "cursor": "",
+   "expect": {
+    "cursor": "",
+    "state": {
+     "schema": "local-lifecycle/v1",
+     "heads": {},
+     "sources": [],
+     "plans": [],
+     "events": [],
+     "requests": {},
+     "workers": {},
+     "receipts": [],
+     "tasks": {},
+     "outbox": {}
+    }
+   }
+  },
+  {
+   "op": "history",
+   "cursor": "",
+   "expect": {
+    "cursors": []
+   }
+  }
+ ]
+}
