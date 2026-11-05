@@ -61,12 +61,12 @@ func (s *MemoryStore) history(cursor string) ([]string, error) {
 	return result, nil
 }
 
-func (s *MemoryStore) Read(cursor *string) (*View, error) {
+func (s *MemoryStore) Read(cursor any) (*View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	at := s.root
-	if cursor != nil {
-		at = *cursor
+	at, err := cursorAt(cursor, s.root)
+	if err != nil {
+		return nil, err
 	}
 	if at == "" {
 		return newView(s, "", EmptyState(), map[string]string{}), nil

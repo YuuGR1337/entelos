@@ -141,16 +141,18 @@ func lines(out []byte) []string {
 	return result
 }
 
-func (s *GitStore) object(handle string) ([]byte, error) { return s.Git(nil, "cat-file", "blob", handle) }
+func (s *GitStore) object(handle string) ([]byte, error) {
+	return s.Git(nil, "cat-file", "blob", handle)
+}
 
-func (s *GitStore) Read(cursor *string) (*View, error) {
+func (s *GitStore) Read(cursor any) (*View, error) {
 	root, err := s.Root()
 	if err != nil {
 		return nil, err
 	}
-	at := root
-	if cursor != nil {
-		at = *cursor
+	at, err := cursorAt(cursor, root)
+	if err != nil {
+		return nil, err
 	}
 	if at == "" {
 		return newView(s, "", EmptyState(), map[string]string{}), nil

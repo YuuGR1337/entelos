@@ -1,0 +1,139 @@
+{
+ "format": "storage-port-vector/v1",
+ "id": "failed-publication",
+ "description": "If apply fails, the store publishes no state, no request record and no content. The key stays free.",
+ "invariants": [
+  "no_partial_state_after_failure",
+  "atomic_publication"
+ ],
+ "steps": [
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "key-1",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 1
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [
+     {
+      "put": "note",
+      "value": {
+       "note": "alpha",
+       "n": 1
+      },
+      "expect_ref": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6"
+     },
+     {
+      "set": [
+       "heads",
+       "example.alpha"
+      ],
+      "value": "partial"
+     },
+     {
+      "raise": "apply_failed"
+     }
+    ],
+    "result": "never"
+   },
+   "expect": {
+    "error": "apply_failed",
+    "apply_calls": 1
+   }
+  },
+  {
+   "op": "read",
+   "actions": [
+    {
+     "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+     "kind": "note",
+     "expect": {
+      "error": "artifact_unavailable"
+     }
+    }
+   ],
+   "expect": {
+    "cursor": "",
+    "state": {
+     "schema": "local-lifecycle/v1",
+     "heads": {},
+     "sources": [],
+     "plans": [],
+     "events": [],
+     "requests": {},
+     "workers": {},
+     "receipts": [],
+     "tasks": {},
+     "outbox": {}
+    }
+   }
+  },
+  {
+   "op": "history",
+   "cursor": "",
+   "expect": {
+    "cursors": []
+   }
+  },
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "key-1",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 2
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [],
+    "result": "retry"
+   },
+   "expect": {
+    "reused": false,
+    "result": "retry",
+    "apply_calls": 1,
+    "bind": "c1"
+   }
+  },
+  {
+   "op": "read",
+   "actions": [
+    {
+     "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+     "kind": "note",
+     "expect": {
+      "error": "artifact_unavailable"
+     }
+    }
+   ],
+   "expect": {
+    "cursor": "$c1",
+    "state_includes": {
+     "heads": {},
+     "requests": {
+      "key-1": {
+       "payload_ref": "sha256:f07f807532cf04ead3be8711829b4d21392419da0e461798a5505efd9f113fb7",
+       "result": "retry"
+      }
+     }
+    }
+   }
+  },
+  {
+   "op": "history",
+   "cursor": "$c1",
+   "expect": {
+    "cursors": [
+     "$c1"
+    ]
+   }
+  }
+ ]
+}

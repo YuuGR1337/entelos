@@ -26,12 +26,14 @@ The `go-lifecycle-core` check in `verify.py` does these steps:
 3. Run `go test` with the Git repository that the parity run made.
 4. Run `go vet`.
 
+`vectors_test.go` runs each storage port vector in `src/cel-lifecycle/conformance/storage/` on a new Git store and a new in-memory store.
+
 The parity check aliases each content reference and each cursor by its first appearance. Then it compares the two traces and the scenario checks. The snapshot references must also be byte-identical.
 
 ## Limits
 
 - Records that hold the lifecycle build (reports, receipts and decisions) have different content references, because the two builds are different.
 - A fault code is the same as in Python. A message that comes from a Python exception text can be different.
-- The scenario parity runs only on the Git adapter. The in-memory adapter has store tests and one in-process Host test.
+- The scenario parity runs only on the Git adapter. The in-memory adapter has the storage vectors, store tests and one in-process Host test.
 - The build identity includes the test sources of the package.
 - Windows is not tested.

@@ -191,7 +191,7 @@ func TestTwoActivationWritersPublishOnlyOneRoot(t *testing.T) {
 		len(after.State["outbox"].(Object)) != len(before.State["outbox"].(Object))+1 {
 		t.Fatal("not exactly one accepted activation")
 	}
-	old, _ := f.store.Read(&before.Cursor)
+	old, _ := f.store.Read(before.Cursor)
 	if !equal(old.State, before.State) {
 		t.Fatal("the old root changed")
 	}

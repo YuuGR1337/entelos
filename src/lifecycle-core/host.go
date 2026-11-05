@@ -428,23 +428,8 @@ func (h *Host) resolve(v *View, function any, at any) Object {
 		"engine_build": item(snapshot, "engine_build"), "report_ref": item(event, "report_ref"), "decision_ref": item(event, "decision_ref")}
 }
 
-// readCursor is the Python cursor argument of store.read.
-func readCursor(value any) *string {
-	switch c := value.(type) {
-	case nil:
-		return nil
-	case string:
-		return &c
-	}
-	if truthy(value) {
-		typeError("expected string or bytes-like object, got '%s'", typeName(value))
-	}
-	empty := ""
-	return &empty
-}
-
 func (h *Host) readOperation(op string, q Object) any {
-	v := must(h.Store.Read(readCursor(lookup(q, "cursor", nil))))
+	v := must(h.Store.Read(lookup(q, "cursor", nil)))
 	switch op {
 	case "inspect":
 		return Object{"cursor": v.Cursor, "state": v.State}
@@ -758,7 +743,7 @@ func (h *Host) apply(v *View, op string, q Object) any {
 			if !ok || cursor == "" {
 				fail("invalid_cursor", "restatement requires a concrete later cursor", "")
 			}
-			later := must(h.Store.Read(&cursor))
+			later := must(h.Store.Read(cursor))
 			prior := item(item(old, "selection"), "registry_cursor")
 			history := must(h.Store.History(later.Cursor))
 			if equal(later.Cursor, prior) || !withinStrings(prior, history) {

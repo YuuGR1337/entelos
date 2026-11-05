@@ -90,7 +90,7 @@ func TestHistoricalReadAndSnapshotsDoNotMix(t *testing.T) {
 	eachStore(t, func(t *testing.T, s Store) {
 		first := write(t, s, "", "a", "1")
 		second := write(t, s, first, "b", "2")
-		old, err := s.Read(&first)
+		old, err := s.Read(first)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,11 +110,11 @@ func TestHistoricalReadAndSnapshotsDoNotMix(t *testing.T) {
 			t.Fatalf("history %v", history)
 		}
 		other := strings.Repeat("a", 40)
-		if _, err := s.Read(&other); err == nil {
+		if _, err := s.Read(other); err == nil {
 			t.Fatal("a cursor outside history was read")
 		}
 		empty := ""
-		if v, err := s.Read(&empty); err != nil || len(v.State["heads"].(Object)) != 0 {
+		if v, err := s.Read(empty); err != nil || len(v.State["heads"].(Object)) != 0 {
 			t.Fatalf("empty cursor: %v", err)
 		}
 	})

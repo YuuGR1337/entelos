@@ -12,8 +12,9 @@ import (
 // Store is the storage port of the lifecycle core.
 type Store interface {
 	// Read gives an immutable view at a cursor. A nil cursor is the current
-	// accepted root. An empty cursor is the empty state.
-	Read(cursor *string) (*View, error)
+	// accepted root. An empty cursor is the empty state. A cursor that is not
+	// a string gives unknown_cursor.
+	Read(cursor any) (*View, error)
 	// Transact runs apply on the current view and publishes the result
 	// atomically, only if the root is still the expected revision. A
 	// request key that already succeeded gives its original result.
@@ -104,6 +105,18 @@ func (v *View) Get(ref any, kind string) (Object, error) {
 	return m, nil
 }
 
+// cursorAt gives the cursor to read. nil is the current root.
+func cursorAt(cursor any, root string) (string, error) {
+	if cursor == nil {
+		return root, nil
+	}
+	at, ok := cursor.(string)
+	if !ok {
+		return "", NewFault("unknown_cursor", "cursor is not in accepted history", "store")
+	}
+	return at, nil
+}
+
 // EmptyState is the state before the first accepted transaction.
 func EmptyState() Object {
 	return Object{"schema": "local-lifecycle/v1", "heads": Object{}, "sources": Array{}, "plans": Array{}, "events": Array{},
@@ -120,7 +133,9 @@ func checkKey(key any) (string, error) {
 }
 
 // requestDigest is the identity of an idempotent request payload.
-func requestDigest(payload any) string { return ContentRef(Envelope(Media("request"), Encode(payload))) }
+func requestDigest(payload any) string {
+	return ContentRef(Envelope(Media("request"), Encode(payload)))
+}
 
 // reuse finds an earlier success of a request key. found is false if the key
 // has no earlier success.
@@ -144,7 +159,7 @@ func reuse(store Store, view *View, key, digest string) (Object, bool, error) {
 	}
 	for _, cursor := range history {
 		c := cursor
-		older, err := store.Read(&c)
+		older, err := store.Read(c)
 		if err != nil {
 			return nil, true, err
 		}

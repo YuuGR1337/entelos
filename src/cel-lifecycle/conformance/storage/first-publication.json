@@ -1,0 +1,96 @@
+{
+ "format": "storage-port-vector/v1",
+ "id": "first-publication",
+ "description": "One transaction publishes its state change, its request record and its content together.",
+ "invariants": [
+  "atomic_publication",
+  "immutable_content_identity"
+ ],
+ "steps": [
+  {
+   "op": "transact",
+   "expected": "",
+   "key": "key-1",
+   "payload": {
+    "request": {
+     "op": "example.write",
+     "value": 1
+    },
+    "actor": "actor-a"
+   },
+   "apply": {
+    "actions": [
+     {
+      "cursor_is": ""
+     },
+     {
+      "put": "note",
+      "value": {
+       "note": "alpha",
+       "n": 1
+      },
+      "expect_ref": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6"
+     },
+     {
+      "set": [
+       "heads",
+       "example.alpha"
+      ],
+      "value": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6"
+     }
+    ],
+    "result": {
+     "written": "alpha"
+    }
+   },
+   "expect": {
+    "reused": false,
+    "result": {
+     "written": "alpha"
+    },
+    "apply_calls": 1,
+    "bind": "c1"
+   }
+  },
+  {
+   "op": "read",
+   "actions": [
+    {
+     "get": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6",
+     "kind": "note",
+     "expect": {
+      "value": {
+       "note": "alpha",
+       "n": 1
+      }
+     }
+    }
+   ],
+   "expect": {
+    "cursor": "$c1",
+    "state_includes": {
+     "heads": {
+      "example.alpha": "sha256:53c709677a59fc07859c23d4e88ca5d1e977f5c4a7cbab0b839a0767f7810ed6"
+     },
+     "requests": {
+      "key-1": {
+       "payload_ref": "sha256:bae07b9933175d172036169fca3d2891aefd6dcaa448f87f94ee7b4ae1dd4417",
+       "result": {
+        "written": "alpha"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "op": "history",
+   "cursor": "$c1",
+   "expect": {
+    "cursors": [
+     "$c1"
+    ]
+   }
+  }
+ ]
+}
