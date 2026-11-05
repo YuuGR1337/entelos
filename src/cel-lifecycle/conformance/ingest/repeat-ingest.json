@@ -2,81 +2,17 @@
  "format": "ingest-vector/v1",
  "id": "repeat-ingest",
  "description": "A second ingest of the same log adds no records. A retry with the same request key gives the first result. An overlap appends only the new cursor. Raw inputs are not uploaded by default.",
- "context": {
-  "actor": "executor-a",
-  "roles": [
-   "worker",
-   "reader"
-  ],
-  "scope": "tenant-example",
-  "runner_actor": "fixture-runner",
-  "worker": "executor-a",
-  "functions": [
-   "record.visible"
-  ]
- },
- "seed": [
-  {
-   "put": "snapshot",
-   "value": {
-    "function": "record.visible",
-    "scope": "tenant-example",
-    "from": "2026-11-01",
-    "until": "2026-12-01",
-    "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "engine_build": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-    "stale_mode": "fail_closed"
-   },
-   "expect_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933"
-  }
- ],
- "entries": {
-  "e1": {
-   "cursor": 1,
-   "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933",
-   "date": "2026-11-15",
-   "inputs_ref": "sha256:d28ea6c2423723cadc9c2edccc389c89923482944db672f124e6590f53fbf802",
-   "response": {
-    "status": "ok",
-    "value": true,
-    "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-   }
-  },
-  "e2": {
-   "cursor": 2,
-   "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933",
-   "date": "2026-11-15",
-   "inputs_ref": "sha256:769c9068dee945edc52f152d98e488b6a01d4ed1eaf6dc6aef7b646d856870e9",
-   "response": {
-    "status": "ok",
-    "value": false,
-    "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-   }
-  },
-  "e3": {
-   "cursor": 3,
-   "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933",
-   "date": "2026-11-15",
-   "inputs_ref": "sha256:4084f3f2ebd69e670038a35c8c5c935143341968c409fec27e704c32297b5cad",
-   "response": {
-    "status": "ok",
-    "value": false,
-    "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-   },
-   "stale_reason": "expired"
-  }
- },
+ "context": {"actor": "executor-a", "roles": ["worker", "reader"], "scope": "tenant-example", "runner_actor": "fixture-runner", "worker": "executor-a", "functions": ["record.visible"]},
+ "seed": [{"put": "snapshot", "value": {"function": "record.visible", "scope": "tenant-example", "from": "2026-11-01", "until": "2026-12-01", "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "engine_build": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "stale_mode": "continue_stale"}, "expect_ref": "sha256:f15995b044058bd0cd66ea1385a400d5a18ff1bb2fb15b1517bc7bb9fcbe9fa1"}, {"put": "event", "value": {"function": "record.visible", "scope": "tenant-example", "from": "2026-11-01", "until": "2026-12-01", "kind": "enable", "snapshot_ref": "sha256:f15995b044058bd0cd66ea1385a400d5a18ff1bb2fb15b1517bc7bb9fcbe9fa1", "targets": []}, "expect_ref": "sha256:83f9db0583e7bb09aa8709908dc643a5b6775ecba4818d910f08d9ba2ab24cad", "list": "events"}],
+ "entries": {"e1": {"cursor": 1, "snapshot_ref": "sha256:f15995b044058bd0cd66ea1385a400d5a18ff1bb2fb15b1517bc7bb9fcbe9fa1", "date": "2026-11-15", "inputs_ref": "sha256:d28ea6c2423723cadc9c2edccc389c89923482944db672f124e6590f53fbf802", "response": {"status": "ok", "value": true, "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}}, "e2": {"cursor": 2, "snapshot_ref": "sha256:f15995b044058bd0cd66ea1385a400d5a18ff1bb2fb15b1517bc7bb9fcbe9fa1", "date": "2026-11-15", "inputs_ref": "sha256:769c9068dee945edc52f152d98e488b6a01d4ed1eaf6dc6aef7b646d856870e9", "response": {"status": "ok", "value": false, "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}}, "e3": {"cursor": 3, "snapshot_ref": "sha256:f15995b044058bd0cd66ea1385a400d5a18ff1bb2fb15b1517bc7bb9fcbe9fa1", "date": "2026-12-15", "inputs_ref": "sha256:4084f3f2ebd69e670038a35c8c5c935143341968c409fec27e704c32297b5cad", "response": {"status": "ok", "value": false, "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}, "stale_reason": "expired"}},
  "steps": [
-  {"name": "first-ingest", "request": {"op": "ingest", "request_key": "k-1", "entries": ["e1", "e2"]}, "expect": {"result": {"executor_id": "executor-a", "log_cursor": 2, "added": 2, "receipts": ["sha256:b96129fc8dcd9cf9df8f850adc8cde3b9ab8303731a80a09ed923accde37f776", "sha256:33549575a8e20b1655145f21daa17d24bdf89096fb2e5869f4cc9e17f19fde74"]}, "reused": false}, "objects": 5, "executors": {"executor-a": ["sha256:b96129fc8dcd9cf9df8f850adc8cde3b9ab8303731a80a09ed923accde37f776", "sha256:33549575a8e20b1655145f21daa17d24bdf89096fb2e5869f4cc9e17f19fde74"]}, "stored": {"sha256:d28ea6c2423723cadc9c2edccc389c89923482944db672f124e6590f53fbf802": false, "sha256:769c9068dee945edc52f152d98e488b6a01d4ed1eaf6dc6aef7b646d856870e9": false}},
-  {"name": "same-log-new-key", "request": {"op": "ingest", "request_key": "k-2", "entries": ["e1", "e2"]}, "expect": {"result": {"executor_id": "executor-a", "log_cursor": 2, "added": 0, "receipts": ["sha256:b96129fc8dcd9cf9df8f850adc8cde3b9ab8303731a80a09ed923accde37f776", "sha256:33549575a8e20b1655145f21daa17d24bdf89096fb2e5869f4cc9e17f19fde74"]}, "reused": false}, "objects": 5, "executors": {"executor-a": ["sha256:b96129fc8dcd9cf9df8f850adc8cde3b9ab8303731a80a09ed923accde37f776", "sha256:33549575a8e20b1655145f21daa17d24bdf89096fb2e5869f4cc9e17f19fde74"]}},
-  {"name": "same-log-same-key", "request": {"op": "ingest", "request_key": "k-1", "entries": ["e1", "e2"]}, "expect": {"result": {"executor_id": "executor-a", "log_cursor": 2, "added": 2, "receipts": ["sha256:b96129fc8dcd9cf9df8f850adc8cde3b9ab8303731a80a09ed923accde37f776", "sha256:33549575a8e20b1655145f21daa17d24bdf89096fb2e5869f4cc9e17f19fde74"]}, "reused": true}, "objects": 5},
-  {"name": "overlap", "request": {"op": "ingest", "request_key": "k-3", "entries": ["e2", "e3"]}, "expect": {"result": {"executor_id": "executor-a", "log_cursor": 3, "added": 1, "receipts": ["sha256:33549575a8e20b1655145f21daa17d24bdf89096fb2e5869f4cc9e17f19fde74", "sha256:d491509204d4f76c3d749bb56ae1e0bf4ef8541406962b822121f6c147ffdf3e"]}, "reused": false}, "objects": 6, "executors": {"executor-a": ["sha256:b96129fc8dcd9cf9df8f850adc8cde3b9ab8303731a80a09ed923accde37f776", "sha256:33549575a8e20b1655145f21daa17d24bdf89096fb2e5869f4cc9e17f19fde74", "sha256:d491509204d4f76c3d749bb56ae1e0bf4ef8541406962b822121f6c147ffdf3e"]}},
-  {"name": "read-ingested-receipt", "request": {"op": "receipt", "receipt_ref": "sha256:d491509204d4f76c3d749bb56ae1e0bf4ef8541406962b822121f6c147ffdf3e"}, "expect": {"result": {"format": "entelos.record/1", "function": "record.visible", "scope": "tenant-example", "mode": "ingest", "selection": {"function": "record.visible", "scope": "tenant-example", "date": "2026-11-15", "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933", "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "engine_build": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}, "inputs_ref": "sha256:4084f3f2ebd69e670038a35c8c5c935143341968c409fec27e704c32297b5cad", "response_ref": "sha256:4953d4f084ba2de70ac6add33065f88b66ac6953197b4f62ebac98b270c5f0aa", "executor_id": "executor-a", "log_cursor": 3, "stale_mode": "fail_closed", "stale": true, "stale_reason": "expired"}}},
-  {"name": "raw-inputs-refused-by-default", "request": {"op": "ingest", "request_key": "k-4", "entries": [{"cursor": 4, "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933", "date": "2026-11-15", "inputs_ref": "sha256:d28ea6c2423723cadc9c2edccc389c89923482944db672f124e6590f53fbf802", "response": {"status": "ok", "value": true, "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}, "inputs": {"state": "approved", "archived": false}}]}, "expect": {"error": "upload_not_permitted"}, "objects": 6},
-  {"name": "entry-names-an-executor", "request": {"op": "ingest", "request_key": "k-5", "entries": [{"cursor": 1, "snapshot_ref": "sha256:9f0d1df09b9f7e5cfb32690d38dcc7bb0d227fe3d0bcad6189866d6db3930933", "date": "2026-11-15", "inputs_ref": "sha256:d28ea6c2423723cadc9c2edccc389c89923482944db672f124e6590f53fbf802", "response": {"status": "ok", "value": true, "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "implementation_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}, "executor_id": "executor-b"}]}, "expect": {"error": "invalid_request"}, "objects": 6},
-  {"name": "request-names-an-executor", "request": {"op": "ingest", "request_key": "k-6", "entries": ["e1"], "executor_id": "executor-b"}, "expect": {"error": "invalid_request"}, "objects": 6}
+  {"name": "first-ingest", "request": {"op": "ingest", "request_key": "k-1", "entries": ["e1", "e2"]}, "expect": {"result": {"executor_id": "executor-a", "log_cursor": 2, "added": 2, "receipts": ["sha256:f61d5b4d05961b7b018be54e1b5dd87c6b0b7050a74351c3cc297a76bfa4e0a8", "sha256:6b215c37b44736f6cea0c9820f878e86cad0c3afcedc132e26bbeba352f08657"]}, "reused": false}, "objects": 6, "executors": {"executor-a": ["sha256:f61d5b4d05961b7b018be54e1b5dd87c6b0b7050a74351c3cc297a76bfa4e0a8", "sha256:6b215c37b44736f6cea0c9820f878e86cad0c3afcedc132e26bbeba352f08657"]}, "stored": {"sha256:d28ea6c2423723cadc9c2edccc389c89923482944db672f124e6590f53fbf802": false, "sha256:769c9068dee945edc52f152d98e488b6a01d4ed1eaf6dc6aef7b646d856870e9": false}},
+  {"name": "same-log-new-key", "request": {"op": "ingest", "request_key": "k-2", "entries": ["e1", "e2"]}, "expect": {"result": {"executor_id": "executor-a", "log_cursor": 2, "added": 0, "receipts": ["sha256:f61d5b4d05961b7b018be54e1b5dd87c6b0b7050a74351c3cc297a76bfa4e0a8", "sha256:6b215c37b44736f6cea0c9820f878e86cad0c3afcedc132e26bbeba352f08657"]}, "reused": false}, "objects": 6, "executors": {"executor-a": ["sha256:f61d5b4d05961b7b018be54e1b5dd87c6b0b7050a74351c3cc297a76bfa4e0a8", "sha256:6b215c37b44736f6cea0c9820f878e86cad0c3afcedc132e26bbeba352f08657"]}},
+  {"name": "same-log-same-key", "request": {"op": "ingest", "request_key": "k-1", "entries": ["e1", "e2"]}, "expect": {"result": {"executor_id": "executor-a", "log_cursor": 2, "added": 2, "receipts": ["sha256:f61d5b4d05961b7b018be54e1b5dd87c6b0b7050a74351c3cc297a76bfa4e0a8", "sha256:6b215c37b44736f6cea0c9820f878e86cad0c3afcedc132e26bbeba352f08657"]}, "reused": true}, "objects": 6},
+  {"name": "overlap", "request": {"op": "ingest", "request_key": "k-3", "entries": ["e2", "e3"]}, "expect": {"result": {"executor_id": "executor-a", "log_cursor": 3, "added": 1, "receipts": ["sha256:6b215c37b44736f6cea0c9820f878e86cad0c3afcedc132e26bbeba352f08657", "sha256:e645bcd73d863fc652ea6761b88984e283876080eb3731e43424d762eb2e1f3d"]}, "reused": false}, "objects": 7, "executors": {"executor-a": ["sha256:f61d5b4d05961b7b018be54e1b5dd87c6b0b7050a74351c3cc297a76bfa4e0a8", "sha256:6b215c37b44736f6cea0c9820f878e86cad0c3afcedc132e26bbeba352f08657", "sha256:e645bcd73d863fc652ea6761b88984e283876080eb3731e43424d762eb2e1f3d"]}},
+  {"name": "read-ingested-receipt", "request": {"op": "receipt", "receipt_ref": "sha256:e645bcd73d863fc652ea6761b88984e283876080eb3731e43424d762eb2e1f3d"}, "expect": {"result": {"format": "entelos.record/1", "function": "record.visible", "scope": "tenant-example", "mode": "ingest", "selection": {"function": "record.visible", "scope": "tenant-example", "date": "2026-12-15", "snapshot_ref": "sha256:f15995b044058bd0cd66ea1385a400d5a18ff1bb2fb15b1517bc7bb9fcbe9fa1", "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "engine_build": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}, "inputs_ref": "sha256:4084f3f2ebd69e670038a35c8c5c935143341968c409fec27e704c32297b5cad", "response_ref": "sha256:4953d4f084ba2de70ac6add33065f88b66ac6953197b4f62ebac98b270c5f0aa", "executor_id": "executor-a", "log_cursor": 3, "stale_mode": "continue_stale", "stale": true, "stale_reason": "expired"}}},
+  {"name": "raw-inputs-refused-by-default", "request": {"op": "ingest", "request_key": "k-4", "entries": [{"like": "e1", "cursor": 4, "inputs": {"state": "approved", "archived": false}}]}, "expect": {"error": "upload_not_permitted"}, "objects": 7},
+  {"name": "entry-names-an-executor", "request": {"op": "ingest", "request_key": "k-5", "entries": [{"like": "e1", "executor_id": "executor-b"}]}, "expect": {"error": "invalid_request"}, "objects": 7},
+  {"name": "request-names-an-executor", "request": {"op": "ingest", "request_key": "k-6", "entries": ["e1"], "executor_id": "executor-b"}, "expect": {"error": "invalid_request"}, "objects": 7}
  ]
 }

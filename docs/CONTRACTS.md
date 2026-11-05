@@ -121,13 +121,20 @@ The Host is the executor for `invoke`, `replay` and `restate`. Each of these rec
 
 | Field | Meaning |
 |---|---|
-| `cursor` | The local log cursor: an integer from 1. |
-| `snapshot_ref` | The pinned snapshot. It must be a snapshot in the store, in the trusted scope, for an installed function. |
+| `cursor` | The local log cursor: an integer from 1 to 2^53-1. On a 32-bit platform, the cursor must also be in the range of an `int`. |
+| `snapshot_ref` | The pinned snapshot. It must be a snapshot in the store, in the trusted scope, for a function in the context `functions`. Else the result is `out_of_scope`, as for `resolve`. |
 | `date` | The invocation date, as an ISO date. |
 | `inputs_ref` | The input digest. |
 | `response` | The answer object of the executor. Its `bundle_ref` must equal the `bundle_ref` of the snapshot, or the result is `artifact_mismatch`. |
 | `stale_reason` | Optional: `expired`, `revoked` or an empty string. |
 | `inputs` | Optional: the raw inputs. Only the upload policy permits this field. |
+
+The entry date must agree with an activation of the pinned snapshot. The Host examines the `enable` events of the registry for this function and scope that name the snapshot:
+
+1. If `stale_reason` is not empty and the `stale_mode` of the snapshot is not `continue_stale`, the result is `activation_expired` or `activation_revoked`. These are the codes that `invoke` gives in the `fail_closed` mode, so a `fail_closed` revision has no stale receipt.
+2. If `stale_reason` is empty or `revoked`, one of these events must have `from` at or before the date and `until` after the date.
+3. If `stale_reason` is `expired`, one of these events must have `from` and `until` at or before the date.
+4. If no event agrees, the result is `out_of_scope` (stage `resolve`).
 
 An entry has no `executor_id` field, and an unknown field is `invalid_request`. Thus a request cannot name another executor. To ingest for a different executor, the embedding host installs a context with that `worker` value.
 
@@ -151,11 +158,11 @@ The raw inputs stay with the executor by default. The host context field `upload
 These are the limits of ingest:
 
 - The Host does not run the rule again. An ingested receipt is the statement of the executor, bound to its executor ID and the pinned snapshot. A content reference is not a signature.
-- The Host does not check that an activation of the snapshot was live at the date.
+- The Host does not compare an empty stale reason and `revoked` for a date in an activation interval. A later mask can revoke an activation after the executor wrote its entry, and the executor did not know about it at that time. Thus the Host cannot disprove the stale reason, and the reason stays the statement of the executor.
 - An ingested receipt is not in `state.receipts`. It has no registry selection, so `replay` and `restate` give `artifact_unavailable`. Use `inspect` for `state.executors` and `receipt` to read each ingested receipt.
 - There is no network transport for ingest. The executor sends its log through the JSONL host or the local socket.
 
-The vectors in [conformance/ingest/](../src/cel-lifecycle/conformance/ingest/) state the expected results. Each vector writes a seed snapshot to a new store, sends Host requests (a string in `entries` names an entry in the `entries` object of the vector) and checks the result, the number of stored objects, the executor logs and the stored raw inputs. The expected receipt references come from the record shape above. `ingest_test.go` runs each vector on a new Git store and a new in-memory store.
+The vectors in [conformance/ingest/](../src/cel-lifecycle/conformance/ingest/) state the expected results. Each vector writes a seed snapshot and its `enable` event to a new store, sends Host requests (a string in `entries` names an entry in the `entries` object of the vector) and checks the result, the number of stored objects, the executor logs and the stored raw inputs. The expected receipt references come from the record shape above. `ingest_test.go` runs each vector on a new Git store and a new in-memory store.
 
 ## Content references for a stage bundle
 

@@ -14,23 +14,31 @@ import (
 	"testing"
 )
 
-// seedStore writes the seed records of a vector directly to the store. The
-// harness checks each content reference against the vector.
-func seedStore(store Store, seed Array) error {
-	_, err := store.Transact("", "seed", Object{"op": "seed"}, func(v *View) (any, error) {
+// seedStore writes seed records directly to the store and gives their
+// references. If a seed has expect_ref, the harness checks the reference.
+// If a seed has list, the harness appends the reference to that state list.
+func seedStore(store Store, key string, seed Array) ([]string, error) {
+	var refs []string
+	view, _ := store.Read(nil)
+	_, err := store.Transact(view.Cursor, key, Object{"op": "seed", "seed": seed}, func(v *View) (any, error) {
 		for _, raw := range seed {
 			s := raw.(Object)
-			if got := v.Put(s["put"].(string), copyObject(s["value"].(Object))); got != s["expect_ref"] {
-				return nil, fmt.Errorf("seed reference %s, want %s", got, s["expect_ref"])
+			got := v.Put(s["put"].(string), copyObject(s["value"].(Object)))
+			if want, has := s["expect_ref"]; has && got != want {
+				return nil, fmt.Errorf("seed reference %s, want %s", got, want)
 			}
+			if list, ok := s["list"].(string); ok {
+				v.State[list] = append(stringList(v.State[list]), got)
+			}
+			refs = append(refs, got)
 		}
 		return nil, nil
 	})
-	return err
+	return refs, err
 }
 
 func runIngestVector(t *testing.T, store Store, vector Object) {
-	if err := seedStore(store, vector["seed"].(Array)); err != nil {
+	if _, err := seedStore(store, "seed", vector["seed"].(Array)); err != nil {
 		t.Fatal(err)
 	}
 	host, err := NewHost(store, nil, vector["context"])
@@ -41,12 +49,17 @@ func runIngestVector(t *testing.T, store Store, vector Object) {
 		step := raw.(Object)
 		where := fmt.Sprintf("steps[%d] %v", i, step["name"])
 		q := copyObject(step["request"].(Object))
-		// A string in entries names an entry of the vector.
+		// A string in entries names an entry of the vector. An object with
+		// "like" is that named entry with the other fields of the object.
 		if list, ok := q["entries"].(Array); ok {
 			entries := Array{}
+			named := vector["entries"].(Object)
 			for _, x := range list {
 				if name, isName := x.(string); isName {
-					x = vector["entries"].(Object)[name]
+					x = named[name]
+				} else if changed, isObject := x.(Object); isObject && changed["like"] != nil {
+					x = merge(named[changed["like"].(string)].(Object), changed)
+					delete(x.(Object), "like")
 				}
 				entries = append(entries, x)
 			}
@@ -155,7 +168,7 @@ func ingestHost(t *testing.T, change func(Object)) (*Host, *MemoryStore, Object)
 		}
 	}
 	store := NewMemoryStore()
-	if err := seedStore(store, vector["seed"].(Array)); err != nil {
+	if _, err := seedStore(store, "seed", vector["seed"].(Array)); err != nil {
 		t.Fatal(err)
 	}
 	context := copyObject(vector["context"].(Object))
@@ -246,7 +259,8 @@ func TestIngestKeepsRawInputsWithTheExecutorByDefault(t *testing.T) {
 }
 
 // Malformed entries are invalid requests. A pinned snapshot that is not in
-// the store, or a response for another bundle, also stops the ingest.
+// the store, a date that no activation of the snapshot covers, or a response
+// for another bundle, also stops the ingest.
 func TestIngestRefusesMalformedEntries(t *testing.T) {
 	host, store, entry := ingestHost(t, nil)
 	response := entry["response"].(Object)
@@ -262,6 +276,10 @@ func TestIngestRefusesMalformedEntries(t *testing.T) {
 		"bad-digest":       {Array{merge(entry, Object{"inputs_ref": "approved"})}, "invalid_request"},
 		"bad-date":         {Array{merge(entry, Object{"date": "2026-13-01"})}, "invalid_interval"},
 		"bad-stale-reason": {Array{merge(entry, Object{"stale_reason": "late"})}, "invalid_request"},
+		"cursor-too-large": {Array{merge(entry, Object{"cursor": Int{"9007199254740992"}})}, "invalid_request"},
+		"before-from":      {Array{merge(entry, Object{"date": "2026-10-15"})}, "out_of_scope"},
+		"after-until":      {Array{merge(entry, Object{"date": "2026-12-15"})}, "out_of_scope"},
+		"expired-in-range": {Array{merge(entry, Object{"stale_reason": "expired"})}, "out_of_scope"},
 		"other-bundle":     {Array{merge(entry, Object{"response": merge(response, Object{"bundle_ref": "sha256:" + strings.Repeat("c", 64)})})}, "artifact_mismatch"},
 	} {
 		if _, err := host.Handle(ingestRequest(store, name, c.entries...)); codeOf(err) != c.code {
@@ -293,4 +311,58 @@ func TestIngestedReceiptIsNotReplayed(t *testing.T) {
 			t.Errorf("%s: got %v", q["op"], err)
 		}
 	}
+}
+
+// The snapshot must be for a function that the context installs. A stale
+// receipt for a fail_closed snapshot gives the code that invoke gives in
+// that mode. A live receipt for the same snapshot is accepted.
+func TestIngestChecksTheFunctionAndTheStaleMode(t *testing.T) {
+	host, store, entry := ingestHost(t, nil)
+	other := Object{"function": "other.function", "scope": "tenant-example", "from": "2026-11-01", "until": "2026-12-01",
+		"bundle_ref": at(entry, "response", "bundle_ref"), "engine_build": "sha256:" + strings.Repeat("e", 64), "stale_mode": "continue_stale"}
+	closed := merge(other, Object{"function": "record.visible", "from": "2026-10-01", "until": "2026-11-01", "stale_mode": "fail_closed"})
+	refs, err := seedStore(store, "seed-2", Array{Object{"put": "snapshot", "value": other}, Object{"put": "snapshot", "value": closed}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	enable := merge(closed, Object{"kind": "enable", "snapshot_ref": refs[1], "targets": Array{}})
+	if _, err := seedStore(store, "seed-3", Array{Object{"put": "event", "value": enable, "list": "events"}}); err != nil {
+		t.Fatal(err)
+	}
+	for name, c := range map[string]struct {
+		fields Object
+		code   string
+	}{
+		"other-function": {Object{"snapshot_ref": refs[0]}, "out_of_scope"},
+		"closed-revoked": {Object{"snapshot_ref": refs[1], "date": "2026-10-15", "stale_reason": "revoked"}, "activation_revoked"},
+		"closed-expired": {Object{"snapshot_ref": refs[1], "stale_reason": "expired"}, "activation_expired"},
+	} {
+		if _, err := host.Handle(ingestRequest(store, name, merge(entry, c.fields))); codeOf(err) != c.code {
+			t.Errorf("%s: got %v, want %s", name, err, c.code)
+		}
+	}
+	if _, err := host.Handle(ingestRequest(store, "closed-live", merge(entry, Object{"snapshot_ref": refs[1], "date": "2026-10-15"}))); err != nil {
+		t.Fatalf("closed-live: %v", err)
+	}
+}
+
+// A corrupt executors field fails closed. The Host does not replace it.
+func TestIngestRefusesCorruptExecutorState(t *testing.T) {
+	host, store, entry := ingestHost(t, nil)
+	view, _ := store.Read(nil)
+	if _, err := store.Transact(view.Cursor, "corrupt", Object{"op": "corrupt"}, func(v *View) (any, error) {
+		v.State["executors"] = "corrupt"
+		return nil, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := host.Handle(ingestRequest(store, "k-1", entry)); codeOf(err) != "invalid_record" {
+		t.Fatalf("got %v, want invalid_record", err)
+	}
+	defer func() {
+		if f, ok := recover().(*Fault); !ok || f.Code != "invalid_record" {
+			t.Fatalf("setExecutorLog replaced a corrupt field: %v", f)
+		}
+	}()
+	setExecutorLog(&View{State: Object{"executors": Array{}}}, "executor-a", Array{})
 }

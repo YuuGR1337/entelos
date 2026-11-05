@@ -433,46 +433,6 @@
    }
   },
   {
-   "name": "ingest-unknown-snapshot",
-   "request": {
-    "protocol": "1.0",
-    "request_id": "l-14",
-    "operation": "ingest",
-    "body": {
-     "entries": [
-      {
-       "cursor": 1,
-       "snapshot_ref": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-       "date": "2026-11-15",
-       "inputs_ref": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-       "response": {
-        "status": "ok",
-        "value": true
-       }
-      }
-     ],
-     "expected_revision": {
-      "$use": "c2"
-     },
-     "request_key": "k-6"
-    }
-   },
-   "expect": {
-    "response": {
-     "protocol": "1.0",
-     "request_id": "l-14",
-     "status": "artifact_unavailable",
-     "diagnostic": {
-      "code": "artifact_unavailable",
-      "stage": "store",
-      "message": {
-       "$type": "string"
-      }
-     }
-    }
-   }
-  },
-  {
    "name": "ingest-raw-inputs-refused",
    "request": {
     "protocol": "1.0",

@@ -9,6 +9,7 @@ import (
 	"embed"
 	"errors"
 	"io/fs"
+	"math"
 	"os/exec"
 	"runtime"
 	"sort"
@@ -583,9 +584,15 @@ func executorLog(v *View, executor string) Array {
 	return stringList(lookup(logs, executor, Array{}))
 }
 
+// setExecutorLog makes the executors field only if it is absent. A field
+// of another type is a corrupt state, so the write fails closed.
 func setExecutorLog(v *View, executor string, log Array) {
-	logs, ok := v.State["executors"].(Object)
-	if !ok {
+	raw, has := v.State["executors"]
+	logs, ok := raw.(Object)
+	if has && !ok {
+		fail("invalid_record", "state executors must be an object", "store")
+	}
+	if !has {
 		logs = Object{}
 		v.State["executors"] = logs
 	}
@@ -598,14 +605,41 @@ func setExecutorLog(v *View, executor string, log Array) {
 var entryFields = map[string]bool{"cursor": true, "snapshot_ref": true, "date": true, "inputs_ref": true, "response": true,
 	"inputs": true, "stale_reason": true}
 
+// maxCursor is the largest log cursor: the largest exact JSON integer.
+const maxCursor int64 = 1<<53 - 1
+
 // logCursor reads the cursor of a log entry: an integer from 1 to 2^53-1.
+// The parse uses 64 bits on each platform. On a 32-bit platform, a cursor
+// that is larger than the largest int is refused, because no log on that
+// platform has that position.
 func logCursor(value any) int {
 	n, ok := value.(Int)
-	c, err := strconv.Atoi(n.Text)
-	if !ok || err != nil || c < 1 || c > 1<<53-1 {
-		fail("invalid_request", "log entry cursor must be an integer from 1", "")
+	c, err := strconv.ParseInt(n.Text, 10, 64)
+	if !ok || err != nil || c < 1 || c > maxCursor || c > int64(math.MaxInt) {
+		fail("invalid_request", "log entry cursor must be an integer from 1 to 2^53-1", "")
 	}
-	return c
+	return int(c)
+}
+
+// pinnedActivation checks that an enable event of the pinned snapshot
+// covers the date of a log entry. For a stale reason of "" or "revoked",
+// the date must be in the half-open interval of the event. For "expired",
+// the date must be at or after the until date of the event. A stale
+// reason for a fail_closed snapshot is refused with the code that invoke
+// gives in that mode.
+func (h *Host) pinnedActivation(v *View, snapshotRef any, snapshot Object, date, staleReason string) {
+	if staleReason != "" && !equal(lookup(snapshot, "stale_mode", nil), continueStale) {
+		fail("activation_"+staleReason, "the pinned snapshot fails closed, so it has no stale receipt", "resolve")
+	}
+	for _, event := range h.events(v) {
+		if !equal(item(event, "kind"), "enable") || !same(event, snapshot) || !equal(item(event, "snapshot_ref"), snapshotRef) || less(date, item(event, "from")) {
+			continue
+		}
+		if lessEqual(item(event, "until"), date) == (staleReason == "expired") {
+			return
+		}
+	}
+	fail("out_of_scope", "no activation of the pinned snapshot covers the entry date and stale reason", "resolve")
 }
 
 // ingest records the entries of the local log of the executor in the Host
@@ -661,7 +695,10 @@ func (h *Host) ingest(v *View, entries any) Object {
 			fail("input_mismatch", "uploaded inputs differ from inputs_ref", "")
 		}
 		date := checkDate(item(entry, "date"))
+		// scoped refuses a snapshot outside the trusted scope or for a
+		// function that the context does not install, as resolve does.
 		snapshot := h.scoped(v, item(entry, "snapshot_ref"), "snapshot")
+		h.pinnedActivation(v, entry["snapshot_ref"], snapshot, date, staleReason.(string))
 		if !equal(lookup(response, "bundle_ref", nil), item(snapshot, "bundle_ref")) {
 			fail("artifact_mismatch", "the response names a bundle that differs from the pinned snapshot", "")
 		}

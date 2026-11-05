@@ -95,7 +95,7 @@ A failure:
 | `host` | The Host failed with an unexpected error (`internal_error`). The message has no exception text and no paths. |
 | `lifecycle`, `admission`, `resolve`, `runtime`, `store`, `codec` | The Host and the store. The codes are the existing `Fault` codes of the lifecycle core in `src/lifecycle-core`. |
 
-The protocol adds four codes: `unsupported_version`, `invalid_frame`, `response_too_large` and `internal_error`. The receiver also sends `internal_error` if a Host result is outside the value domain, for example a float or an object key that is not a string. All other codes are the existing `Fault` codes, for example `invalid_request`, `forbidden`, `out_of_scope`, `invalid_interval`, `stale_revision`, `idempotency_conflict`, `artifact_unavailable`, `activation_expired`, `activation_revoked`, `ingest_conflict`, `ingest_gap` and `upload_not_permitted`.
+The protocol adds four codes: `unsupported_version`, `invalid_frame`, `response_too_large` and `internal_error`. The receiver also sends `internal_error` if a Host result is outside the value domain, for example a float or an object key that is not a string. All other codes are the existing `Fault` codes, for example `invalid_request`, `forbidden`, `out_of_scope`, `invalid_interval`, `stale_revision`, `idempotency_conflict`, `artifact_unavailable`, `activation_expired` and `activation_revoked`.
 
 `message` is text for a person. A program must use `code` and `stage`. The vectors do not compare `message`.
 
