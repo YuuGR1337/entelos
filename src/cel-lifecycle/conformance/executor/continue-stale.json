@@ -1,0 +1,106 @@
+{
+ "format": "executor-vector/v1",
+ "id": "continue-stale",
+ "description": "A continue_stale pin answers after until and marks the entry expired. A date before from is still out_of_scope.",
+ "bundle": {
+  "function_id": "record.visible",
+  "profile": "cel-string-bool/v1",
+  "caller_variables": [
+   "state",
+   "archived"
+  ],
+  "limits": {
+   "max_request_bytes": 4096,
+   "max_string_utf8_bytes": 256,
+   "max_source_utf8_bytes": 4096,
+   "parser_recursion_limit": 64,
+   "evaluation_cost_limit": 1000
+  },
+  "environment": {
+   "name": "record-filter",
+   "variables": [
+    {
+     "name": "state",
+     "type": "string",
+     "description": "The record state supplied by the caller."
+    },
+    {
+     "name": "archived",
+     "type": "bool",
+     "description": "Whether the caller record is archived."
+    },
+    {
+     "name": "allowed_state",
+     "type": "string",
+     "description": "The fixed allowed state."
+    }
+   ]
+  },
+  "source": "state == allowed_state && !archived\n",
+  "fixed": {
+   "allowed_state": "ready"
+  }
+ },
+ "pin": {
+  "function": "record.visible",
+  "scope": "tenant-example",
+  "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "from": "2026-11-01",
+  "until": "2026-12-01",
+  "stale_mode": "continue_stale",
+  "revoked": false
+ },
+ "steps": [
+  {
+   "name": "live",
+   "cursor": 1,
+   "date": "2026-11-30",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": false}",
+   "expect": {
+    "entry": {
+     "cursor": 1,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-11-30",
+     "inputs_ref": "sha256:5ef0eedcaa5458c104b7af465f065430a1218d71e38db59754b346c317f5fce2",
+     "stale_reason": "",
+     "response": {
+      "status": "ok",
+      "value": true
+     }
+    }
+   }
+  },
+  {
+   "name": "expired",
+   "cursor": 2,
+   "date": "2026-12-01",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": false}",
+   "expect": {
+    "entry": {
+     "cursor": 2,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-12-01",
+     "inputs_ref": "sha256:5ef0eedcaa5458c104b7af465f065430a1218d71e38db59754b346c317f5fce2",
+     "stale_reason": "expired",
+     "response": {
+      "status": "ok",
+      "value": true
+     }
+    }
+   }
+  },
+  {
+   "name": "before-from",
+   "cursor": 3,
+   "date": "2026-10-31",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": false}",
+   "expect": {
+    "diagnostic": {
+     "code": "out_of_scope",
+     "stage": "resolve",
+     "field": "/date"
+    }
+   }
+  }
+ ]
+}

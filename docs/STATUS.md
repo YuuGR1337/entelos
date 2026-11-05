@@ -114,6 +114,8 @@ Issue #84 adds the Go sidecar `entelos-sidecar`: wire protocol 1.0 on a Unix soc
 
 Issue #95 removes the Python lifecycle core: the Python Host, its Git and in-memory stores, its JSONL CLI, the protocol reference adapter and the parity tool. The Go core in `src/lifecycle-core` is now the only Host. `scenario_test.go` runs the lifecycle scenario with the fixture values. Each removed Python test has a Go test or a vector with the same expected values. The examples call the Go JSONL host through the Python callers in `src/lifecycle-core/client/`. `src/cel-lifecycle` keeps the specs, the vectors and the fixtures.
 
+Issue #93 (first part) adds the [executor](CONTRACTS.md#executor) to `cel-handoff`. The maintainer amended decision 0002: qualification is for each build, so the WASM module has its own `implementation_ref`. The same command builds for `js/wasm`. In a browser it serves a JavaScript bridge; under Node with arguments it serves the command line. `verify.py` runs 7 executor vector files on the native build, as WASM under Node and through the bridge, and the entries are equal except for the build and bundle identities (`wasm-executor`). The Go lifecycle scenario also passes with the WASM module as the engine (`wasm-qualification`). On macOS arm64 with Go 1.27.2, the module is about 22 MB raw and 4.3 MB with gzip level 9, and the Node cold start was 63 ms. A browser cold start is unmeasured. The IndexedDB receipt log, the headless browser run and the ingest of a browser log are not done yet.
+
 Keep caller walkthrough and input-correction documentation bounded to the existing examples. Numeric/structured profiles, production DBs, authentication gateways and resident-worker coordination are outside the current implemented scope.
 
 ## Handoff rule

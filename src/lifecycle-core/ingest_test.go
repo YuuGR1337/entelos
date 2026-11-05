@@ -444,3 +444,39 @@ func TestIngestRequestKeyBindsTheExecutor(t *testing.T) {
 		t.Fatalf("a conflict changed the state: %s", Encode(after.State["executors"]))
 	}
 }
+
+// The executor vectors state inputs_ref for each entry. The executor
+// computes it with its own codec. This test computes it with the Host codec
+// from the same input text, so the two codecs agree on each vector.
+func TestExecutorVectorDigestsAgreeWithTheHostCodec(t *testing.T) {
+	paths, _ := filepath.Glob(filepath.Join("..", "cel-lifecycle", "conformance", "executor", "*.json"))
+	if len(paths) == 0 {
+		t.Fatal("no executor vectors")
+	}
+	checked := 0
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		vector := must(Decode(raw)).(Object)
+		for _, s := range vector["steps"].(Array) {
+			step := s.(Object)
+			entry, ok := step["expect"].(Object)["entry"].(Object)
+			if !ok {
+				continue
+			}
+			inputs, err := Decode([]byte(step["inputs_json"].(string)))
+			if err != nil {
+				t.Fatalf("%s/%s: %v", vector["id"], step["name"], err)
+			}
+			if got := InputDigest(inputs); got != entry["inputs_ref"] {
+				t.Errorf("%s/%s: Host digest %s, vector %s", vector["id"], step["name"], got, entry["inputs_ref"])
+			}
+			checked++
+		}
+	}
+	if checked < 10 {
+		t.Fatalf("checked only %d entries", checked)
+	}
+}

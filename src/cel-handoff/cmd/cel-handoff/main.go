@@ -38,6 +38,12 @@ func readBound(path string) ([]byte, error) {
 	return raw, err
 }
 func main() {
+	// A WebAssembly module in a browser has no arguments. It serves the
+	// JavaScript bridge instead of the command line. See bridge_js.go.
+	if bridgeMode() {
+		serveBridge()
+		return
+	}
 	dir := flag.String("bundle", "", "host-selected directory with manifest.json, env.json, rule.cel, fixed.json")
 	casesPath := flag.String("cases", "", "host-owned check cases JSON array")
 	build := flag.Bool("build", false, "print actual implementation identity and dependency build data")

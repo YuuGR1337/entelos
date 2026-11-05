@@ -1,0 +1,166 @@
+{
+ "format": "executor-vector/v1",
+ "id": "pin-load",
+ "description": "A pin must name the loaded bundle, the build of this executor and the bundle function, with a known stale mode, a nonempty interval and an explicit revoked value. Else load fails and the executor serves nothing. A pin for a bundle that qualification passed on another build is implementation_unavailable.",
+ "bundle": {
+  "function_id": "record.visible",
+  "profile": "cel-string-bool/v1",
+  "caller_variables": [
+   "state",
+   "archived"
+  ],
+  "limits": {
+   "max_request_bytes": 4096,
+   "max_string_utf8_bytes": 256,
+   "max_source_utf8_bytes": 4096,
+   "parser_recursion_limit": 64,
+   "evaluation_cost_limit": 1000
+  },
+  "environment": {
+   "name": "record-filter",
+   "variables": [
+    {
+     "name": "state",
+     "type": "string",
+     "description": "The record state supplied by the caller."
+    },
+    {
+     "name": "archived",
+     "type": "bool",
+     "description": "Whether the caller record is archived."
+    },
+    {
+     "name": "allowed_state",
+     "type": "string",
+     "description": "The fixed allowed state."
+    }
+   ]
+  },
+  "source": "state == allowed_state && !archived\n",
+  "fixed": {
+   "allowed_state": "ready"
+  }
+ },
+ "pin": {
+  "function": "record.visible",
+  "scope": "tenant-example",
+  "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "from": "2026-11-01",
+  "until": "2026-12-01",
+  "stale_mode": "fail_closed",
+  "revoked": false
+ },
+ "loads": [
+  {
+   "name": "other-bundle",
+   "pin_replace": {
+    "bundle_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   },
+   "expect": {
+    "code": "artifact_mismatch",
+    "stage": "pin",
+    "field": "/bundle_ref"
+   }
+  },
+  {
+   "name": "other-build",
+   "pin_replace": {
+    "engine_build": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+   },
+   "expect": {
+    "code": "implementation_unavailable",
+    "stage": "pin",
+    "field": "/engine_build"
+   }
+  },
+  {
+   "name": "other-function",
+   "pin_replace": {
+    "function": "record.other"
+   },
+   "expect": {
+    "code": "invalid_pin",
+    "stage": "pin",
+    "field": "/function"
+   }
+  },
+  {
+   "name": "unknown-stale-mode",
+   "pin_replace": {
+    "stale_mode": "continue"
+   },
+   "expect": {
+    "code": "invalid_pin",
+    "stage": "pin",
+    "field": "/stale_mode"
+   }
+  },
+  {
+   "name": "empty-interval",
+   "pin_replace": {
+    "until": "2026-11-01"
+   },
+   "expect": {
+    "code": "invalid_pin",
+    "stage": "pin",
+    "field": "/until"
+   }
+  },
+  {
+   "name": "bad-from",
+   "pin_replace": {
+    "from": "2026-13-01"
+   },
+   "expect": {
+    "code": "invalid_pin",
+    "stage": "pin",
+    "field": "/from"
+   }
+  },
+  {
+   "name": "no-revoked",
+   "pin_replace": {
+    "revoked": null
+   },
+   "expect": {
+    "code": "invalid_pin",
+    "stage": "pin",
+    "field": "/revoked"
+   }
+  },
+  {
+   "name": "bad-snapshot-ref",
+   "pin_replace": {
+    "snapshot_ref": "snapshot-1"
+   },
+   "expect": {
+    "code": "invalid_pin",
+    "stage": "pin",
+    "field": "/snapshot_ref"
+   }
+  },
+  {
+   "name": "empty-scope",
+   "pin_replace": {
+    "scope": ""
+   },
+   "expect": {
+    "code": "invalid_pin",
+    "stage": "pin",
+    "field": "/scope"
+   }
+  },
+  {
+   "name": "unknown-field",
+   "pin_replace": {
+    "stale": true
+   },
+   "expect": {
+    "code": "invalid_pin",
+    "stage": "pin",
+    "field": ""
+   }
+  }
+ ],
+ "steps": []
+}

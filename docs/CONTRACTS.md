@@ -177,6 +177,41 @@ These are the limits of ingest:
 
 The vectors in [conformance/ingest/](../src/cel-lifecycle/conformance/ingest/) state the expected results. Each vector writes a seed snapshot and its `enable` event to a new store, sends Host requests (a string in `entries` names an entry in the `entries` object of the vector) and checks the result, the number of stored objects, the executor logs and the stored raw inputs. The expected receipt references come from the record shape above. `ingest_test.go` runs each vector on a new Git store and a new in-memory store.
 
+## Executor
+
+The executor in `src/cel-handoff/executor.go` runs one pinned activation away from the Host and writes log entries for `ingest`. It reads no clock, file, process or socket. The embedding host supplies the date, the log cursor and the log storage. The same code builds for a native process and for `GOOS=js GOARCH=wasm` (decision [0002](decisions/0002-browser-executor.md)).
+
+`NewExecutor` takes a pin and the four bundle files. The embedding host takes each pin field from the lifecycle records. All fields are required, and an unknown field is `invalid_pin`:
+
+| Field | Source |
+|---|---|
+| `function`, `scope`, `from`, `until`, `snapshot_ref` | The `enable` event. |
+| `bundle_ref`, `engine_build`, `stale_mode` | The snapshot. |
+| `revoked` | `true` if the embedding host knows a later event that masks the activation. |
+
+The pin must name the loaded bundle (else `artifact_mismatch`), the build of this executor (else `implementation_unavailable`) and the bundle function. A bundle that qualification passed on another build fails closed. Qualification is for each build. The WASM module has its own `implementation_ref`, and the Host qualifies with that module under Node. The executor does not verify the pin claims against a store. A content reference is an identity, not a signature.
+
+`Invoke` takes a cursor, a date and the inputs JSON. It gives one entry with the ingest fields `cursor`, `snapshot_ref`, `date`, `inputs_ref`, `response` and `stale_reason`. The entry has no raw inputs. The embedding host keeps them and uploads them only if the upload policy permits it. The rules follow `invoke` (see [Expiry and revocation](#expiry-and-revocation)):
+
+1. A date before `from` is `out_of_scope`.
+2. At or after `until`, the reason is `expired`. Else, if `revoked` is `true`, the reason is `revoked`.
+3. If there is a reason and the stale mode is `fail_closed`, the result is `activation_expired` or `activation_revoked`.
+4. Else the engine runs the inputs. Each answer of the engine gives an entry, also a failed answer such as `needs_input`.
+
+A refusal gives a diagnostic and no entry, so the embedding host writes nothing to its log. The executor refuses a cursor outside 1 to 2^53-1 (`invalid_request`), a date that is not a canonical ISO date (`invalid_interval`) and inputs that are not a strict JSON object of string, boolean and null values (`invalid_input`). Raw inputs longer than `max_request_bytes` are also `invalid_input`, so the executor bounds its parse. The Host records a receipt for a number value in `invoke`. The executor is narrower: the canonical number text of the record codec is not part of the executor.
+
+`inputs_ref` is the content reference of the record codec bytes of the inputs, the same as `InputDigest`. The engine request has the bytes that the Host sends, so the request byte limit applies the same way.
+
+The JavaScript bridge in `cmd/cel-handoff/bridge_js.go` gives the executor as `globalThis.entelosExecutor` with `build()`, `load(pinJSON, files)` and `invoke(cursor, date, inputsJSON)`. Each function returns a JSON string, `{"ok": value}` or `{"diagnostic": d}`. The bundle files are `Uint8Array` values. A module with no command arguments serves the bridge. Under Node with arguments, the same module serves the command line.
+
+The vectors in [conformance/executor/](../src/cel-lifecycle/conformance/executor/) state the expected entries and refusals. Each vector has a bundle without a build identity, a pin without `bundle_ref` and `engine_build`, and steps. A harness binds the bundle and the pin to the build under test. `executor_test.go` runs the vectors on a native build and as WASM under Node. `web/node-check.mjs` runs them through the bridge. `verify.py` compares the three results: they must be equal except for the build identity and the bundle reference. `TestExecutorVectorDigestsAgreeWithTheHostCodec` checks each stated `inputs_ref` with the Host codec.
+
+Limits:
+
+- The executor has no log storage. The embedding host must give each entry a new cursor in order. A browser log in IndexedDB is the next part of #93.
+- The pin fields are claims of the embedding host. At ingest, the Host checks the snapshot, the bundle reference and the activation start again, and it records its own stale view. It does not yet compare the `implementation_ref` of the response with the `engine_build` of the snapshot.
+- No headless browser runs the vectors yet. Node runs the same module and the same bridge.
+
 ## Content references for a stage bundle
 
 A content reference is `sha256:` plus the lowercase hex SHA-256 of `media type + NUL + exact bytes`. Lifecycle records use `application/vnd.cel-lifecycle.<kind>+json`. The four bundle components use:

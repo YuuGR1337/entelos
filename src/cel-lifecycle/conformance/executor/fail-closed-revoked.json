@@ -1,0 +1,94 @@
+{
+ "format": "executor-vector/v1",
+ "id": "fail-closed-revoked",
+ "description": "A revoked fail_closed pin refuses a date in its interval. Expiry comes before revocation, as in the Host.",
+ "bundle": {
+  "function_id": "record.visible",
+  "profile": "cel-string-bool/v1",
+  "caller_variables": [
+   "state",
+   "archived"
+  ],
+  "limits": {
+   "max_request_bytes": 4096,
+   "max_string_utf8_bytes": 256,
+   "max_source_utf8_bytes": 4096,
+   "parser_recursion_limit": 64,
+   "evaluation_cost_limit": 1000
+  },
+  "environment": {
+   "name": "record-filter",
+   "variables": [
+    {
+     "name": "state",
+     "type": "string",
+     "description": "The record state supplied by the caller."
+    },
+    {
+     "name": "archived",
+     "type": "bool",
+     "description": "Whether the caller record is archived."
+    },
+    {
+     "name": "allowed_state",
+     "type": "string",
+     "description": "The fixed allowed state."
+    }
+   ]
+  },
+  "source": "state == allowed_state && !archived\n",
+  "fixed": {
+   "allowed_state": "ready"
+  }
+ },
+ "pin": {
+  "function": "record.visible",
+  "scope": "tenant-example",
+  "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "from": "2026-11-01",
+  "until": "2026-12-01",
+  "stale_mode": "fail_closed",
+  "revoked": true
+ },
+ "steps": [
+  {
+   "name": "revoked",
+   "cursor": 1,
+   "date": "2026-11-15",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": false}",
+   "expect": {
+    "diagnostic": {
+     "code": "activation_revoked",
+     "stage": "resolve",
+     "field": "/date"
+    }
+   }
+  },
+  {
+   "name": "expired-and-revoked",
+   "cursor": 1,
+   "date": "2026-12-01",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": false}",
+   "expect": {
+    "diagnostic": {
+     "code": "activation_expired",
+     "stage": "resolve",
+     "field": "/date"
+    }
+   }
+  },
+  {
+   "name": "before-from",
+   "cursor": 1,
+   "date": "2026-10-31",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": false}",
+   "expect": {
+    "diagnostic": {
+     "code": "out_of_scope",
+     "stage": "resolve",
+     "field": "/date"
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,94 @@
+{
+ "format": "executor-vector/v1",
+ "id": "fail-closed",
+ "description": "A fail_closed pin refuses a date at or after until, a date before from, and each date of a revoked pin. A refusal gives no entry.",
+ "bundle": {
+  "function_id": "record.visible",
+  "profile": "cel-string-bool/v1",
+  "caller_variables": [
+   "state",
+   "archived"
+  ],
+  "limits": {
+   "max_request_bytes": 4096,
+   "max_string_utf8_bytes": 256,
+   "max_source_utf8_bytes": 4096,
+   "parser_recursion_limit": 64,
+   "evaluation_cost_limit": 1000
+  },
+  "environment": {
+   "name": "record-filter",
+   "variables": [
+    {
+     "name": "state",
+     "type": "string",
+     "description": "The record state supplied by the caller."
+    },
+    {
+     "name": "archived",
+     "type": "bool",
+     "description": "Whether the caller record is archived."
+    },
+    {
+     "name": "allowed_state",
+     "type": "string",
+     "description": "The fixed allowed state."
+    }
+   ]
+  },
+  "source": "state == allowed_state && !archived\n",
+  "fixed": {
+   "allowed_state": "ready"
+  }
+ },
+ "pin": {
+  "function": "record.visible",
+  "scope": "tenant-example",
+  "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "from": "2026-11-01",
+  "until": "2026-12-01",
+  "stale_mode": "fail_closed",
+  "revoked": false
+ },
+ "steps": [
+  {
+   "name": "at-until",
+   "cursor": 1,
+   "date": "2026-12-01",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": false}",
+   "expect": {
+    "diagnostic": {
+     "code": "activation_expired",
+     "stage": "resolve",
+     "field": "/date"
+    }
+   }
+  },
+  {
+   "name": "after-until",
+   "cursor": 1,
+   "date": "2027-01-01",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": false}",
+   "expect": {
+    "diagnostic": {
+     "code": "activation_expired",
+     "stage": "resolve",
+     "field": "/date"
+    }
+   }
+  },
+  {
+   "name": "before-from",
+   "cursor": 1,
+   "date": "2026-10-31",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": false}",
+   "expect": {
+    "diagnostic": {
+     "code": "out_of_scope",
+     "stage": "resolve",
+     "field": "/date"
+    }
+   }
+  }
+ ]
+}

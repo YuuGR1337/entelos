@@ -1,0 +1,261 @@
+{
+ "format": "executor-vector/v1",
+ "id": "live-answers",
+ "description": "A live pin gives one entry for each answer of the engine, also for a failed answer such as needs_input. The cursor comes from the host. Key order and white space in the inputs do not change inputs_ref. A string with escapes and non-ASCII text has the lifecycle record bytes.",
+ "bundle": {
+  "function_id": "record.visible",
+  "profile": "cel-string-bool/v1",
+  "caller_variables": [
+   "state",
+   "archived"
+  ],
+  "limits": {
+   "max_request_bytes": 4096,
+   "max_string_utf8_bytes": 256,
+   "max_source_utf8_bytes": 4096,
+   "parser_recursion_limit": 64,
+   "evaluation_cost_limit": 1000
+  },
+  "environment": {
+   "name": "record-filter",
+   "variables": [
+    {
+     "name": "state",
+     "type": "string",
+     "description": "The record state supplied by the caller."
+    },
+    {
+     "name": "archived",
+     "type": "bool",
+     "description": "Whether the caller record is archived."
+    },
+    {
+     "name": "allowed_state",
+     "type": "string",
+     "description": "The fixed allowed state."
+    }
+   ]
+  },
+  "source": "state == allowed_state && !archived\n",
+  "fixed": {
+   "allowed_state": "ready"
+  }
+ },
+ "pin": {
+  "function": "record.visible",
+  "scope": "tenant-example",
+  "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "from": "2026-11-01",
+  "until": "2026-12-01",
+  "stale_mode": "fail_closed",
+  "revoked": false
+ },
+ "steps": [
+  {
+   "name": "match",
+   "cursor": 1,
+   "date": "2026-11-01",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": false}",
+   "expect": {
+    "entry": {
+     "cursor": 1,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-11-01",
+     "inputs_ref": "sha256:5ef0eedcaa5458c104b7af465f065430a1218d71e38db59754b346c317f5fce2",
+     "stale_reason": "",
+     "response": {
+      "status": "ok",
+      "value": true
+     }
+    }
+   }
+  },
+  {
+   "name": "other-state",
+   "cursor": 2,
+   "date": "2026-11-15",
+   "inputs_json": "{\"state\": \"closed\", \"archived\": false}",
+   "expect": {
+    "entry": {
+     "cursor": 2,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-11-15",
+     "inputs_ref": "sha256:769c9068dee945edc52f152d98e488b6a01d4ed1eaf6dc6aef7b646d856870e9",
+     "stale_reason": "",
+     "response": {
+      "status": "ok",
+      "value": false
+     }
+    }
+   }
+  },
+  {
+   "name": "archived",
+   "cursor": 3,
+   "date": "2026-11-30",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": true}",
+   "expect": {
+    "entry": {
+     "cursor": 3,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-11-30",
+     "inputs_ref": "sha256:f552404d33cdbba37e619ccb9f27e7c8db6925c35094a610096f0c8a06afd02b",
+     "stale_reason": "",
+     "response": {
+      "status": "ok",
+      "value": false
+     }
+    }
+   }
+  },
+  {
+   "name": "key-order-and-space",
+   "cursor": 4,
+   "date": "2026-11-15",
+   "inputs_json": "{ \"archived\" : false,\n \"state\":\"ready\" }",
+   "expect": {
+    "entry": {
+     "cursor": 4,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-11-15",
+     "inputs_ref": "sha256:5ef0eedcaa5458c104b7af465f065430a1218d71e38db59754b346c317f5fce2",
+     "stale_reason": "",
+     "response": {
+      "status": "ok",
+      "value": true
+     }
+    }
+   }
+  },
+  {
+   "name": "escapes",
+   "cursor": 5,
+   "date": "2026-11-15",
+   "inputs_json": "{\"state\": \"réa\\\"dy\\\\\\n\\t\\u0001</>\", \"archived\": false}",
+   "expect": {
+    "entry": {
+     "cursor": 5,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-11-15",
+     "inputs_ref": "sha256:678f102b225d191a62876c427273abd971c1b9ee8d7a6620637691beee1f8543",
+     "stale_reason": "",
+     "response": {
+      "status": "ok",
+      "value": false
+     }
+    }
+   }
+  },
+  {
+   "name": "missing-field",
+   "cursor": 6,
+   "date": "2026-11-15",
+   "inputs_json": "{\"state\": \"ready\"}",
+   "expect": {
+    "entry": {
+     "cursor": 6,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-11-15",
+     "inputs_ref": "sha256:b6042fcd6e98fd5e3ee9fc1f907950ebed9bdfeb8fab84e530d959e1321f3ffb",
+     "stale_reason": "",
+     "response": {
+      "status": "needs_input",
+      "diagnostic": {
+       "code": "needs_input",
+       "stage": "input",
+       "field": "/archived"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "null-bool",
+   "cursor": 7,
+   "date": "2026-11-15",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": null}",
+   "expect": {
+    "entry": {
+     "cursor": 7,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-11-15",
+     "inputs_ref": "sha256:3fab8884dfafe6d97cc9b940c9b9b7b41f726cd7e467df87dc3b999801d64082",
+     "stale_reason": "",
+     "response": {
+      "status": "invalid_input",
+      "diagnostic": {
+       "code": "invalid_input",
+       "stage": "input",
+       "field": "/archived"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "mistyped-bool",
+   "cursor": 8,
+   "date": "2026-11-15",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": \"false\"}",
+   "expect": {
+    "entry": {
+     "cursor": 8,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-11-15",
+     "inputs_ref": "sha256:d5360b1e8e4b1d64e2e1511f2b69b50916ada2910f4a3f883b2a2a9374ded810",
+     "stale_reason": "",
+     "response": {
+      "status": "invalid_input",
+      "diagnostic": {
+       "code": "invalid_input",
+       "stage": "input",
+       "field": "/archived"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "fixed-override",
+   "cursor": 9,
+   "date": "2026-11-15",
+   "inputs_json": "{\"state\": \"closed\", \"archived\": false, \"allowed_state\": \"closed\"}",
+   "expect": {
+    "entry": {
+     "cursor": 9,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-11-15",
+     "inputs_ref": "sha256:ad4827c54849179547b609e71b901fb8145257250fc2fbcabb30610ada89e864",
+     "stale_reason": "",
+     "response": {
+      "status": "invalid_input",
+      "diagnostic": {
+       "code": "invalid_input",
+       "stage": "input",
+       "field": "/allowed_state"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "large-cursor",
+   "cursor": 9007199254740991,
+   "date": "2026-11-15",
+   "inputs_json": "{\"state\": \"ready\", \"archived\": false}",
+   "expect": {
+    "entry": {
+     "cursor": 9007199254740991,
+     "snapshot_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+     "date": "2026-11-15",
+     "inputs_ref": "sha256:5ef0eedcaa5458c104b7af465f065430a1218d71e38db59754b346c317f5fce2",
+     "stale_reason": "",
+     "response": {
+      "status": "ok",
+      "value": true
+     }
+    }
+   }
+  }
+ ]
+}
