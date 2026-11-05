@@ -128,7 +128,7 @@
   "src/lifecycle-core/runner_test.go": "e059715a83e4dc64ed2c5e7e71644c9d7604ea39c76c412ddca2de28515906ab",
   "src/lifecycle-core/runtime.go": "d5593191b814a4559a64bb0326f8f6b2c641218cc881a4861de72b320a083555",
   "src/lifecycle-core/runtime_test.go": "78c2408c12ac7696da71cd615d8a815e1614d430695572b9704c4941c17de348",
-  "src/lifecycle-core/scenario_test.go": "906e0d1c3d3e701c3026839d283386a56169e505b71a5638e2033004aad6efcb",
+  "src/lifecycle-core/scenario_test.go": "b506edd379bba3e913829db699165ff181d0cf91ff5c798440f3ccb8c9ec131f",
   "src/lifecycle-core/schema_test.go": "610395088b95b1480f7787cf373f41a270ac6a9b2b7ca507178776a07edcb7f9",
   "src/lifecycle-core/store.go": "9f55d8cb7b43aaf1f50ff61dac0c3ddbe1b1f1b0ee609f1c59260c7710fc7387",
   "src/lifecycle-core/store_test.go": "2863f231ab37b1b9892a84994af388fa13192a5ccb8c161bd4e637d3306c4df5",

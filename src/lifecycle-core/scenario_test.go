@@ -401,14 +401,20 @@ func runScenario() scenarioRun {
 			sharedScenario.err = err
 			return
 		}
-		dir, err := os.MkdirTemp("", "lifecycle-scenario-")
+		// The store goes next to the results file, if there is one, so that
+		// the work directory keeps it after a failure.
+		parent := ""
+		if out := os.Getenv("LIFECYCLE_SCENARIO_RESULTS"); out != "" {
+			parent = filepath.Dir(out)
+		}
+		dir, err := os.MkdirTemp(parent, "lifecycle-scenario-")
 		if err != nil {
 			sharedScenario.err = err
 			return
 		}
 		d, err := newScenarioDriver(filepath.Join(dir, "baseline"), binary, fixture.(Object))
 		if err != nil {
-			sharedScenario.err = err
+			sharedScenario = scenarioRun{dir: dir, err: err}
 			return
 		}
 		pins, err := d.demonstrate(bundle)
@@ -431,8 +437,14 @@ func runScenario() scenarioRun {
 
 func TestMain(m *testing.M) {
 	code := m.Run()
+	// Remove the scenario store only after a run with no failure. After a
+	// failure, keep the store, the objects and the contexts as evidence.
 	if sharedScenario.dir != "" {
-		os.RemoveAll(sharedScenario.dir)
+		if code == 0 && sharedScenario.err == nil {
+			os.RemoveAll(sharedScenario.dir)
+		} else {
+			fmt.Fprintf(os.Stderr, "lifecycle scenario: kept the store at %s\n", sharedScenario.dir)
+		}
 	}
 	os.Exit(code)
 }
