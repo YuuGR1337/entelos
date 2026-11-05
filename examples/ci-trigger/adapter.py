@@ -14,7 +14,7 @@ class Ingress:
 def package():
     spec=fixture()
     return encode({'adapter_source':Path(__file__).read_text(),'support_source':Path(__file__).with_name('support.py').read_text(),
-                   'codec_source':(LIFE/'git_store.py').read_text(),'python_version':sys.version,
+                   'codec_source':(LIFE/'lifecycle_client.py').read_text(),'python_version':sys.version,
                    'environment':spec['environment'],'caller_variables':spec['caller_variables']})
 def build_ref():return content_ref(envelope('application/vnd.ci-projection.implementation',package()))
 

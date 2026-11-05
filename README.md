@@ -77,7 +77,7 @@ The `expected` values come from a fixture file, not from the demo. `Result: pass
 
 ## Call a rule from your service
 
-A service calls a rule through [cli.py](src/cel-lifecycle/cli.py). The service writes one JSON request to stdin and reads one JSON response from stdout. A call has two requests:
+A service calls a rule through the Go lifecycle host [cmd/lifecycle-core](src/lifecycle-core/cmd/lifecycle-core/main.go). Build it with `go build -o <dir>/lifecycle-core ./cmd/lifecycle-core` in `src/lifecycle-core`. The service writes one JSON request to stdin and reads one JSON response from stdout. A call has two requests:
 
 1. `describe` gives the input schema, the exact bundle reference and the store cursor for a function and a date.
 2. `invoke` sends the inputs, the bundle reference and the cursor from `describe`, and a retry key.
@@ -96,7 +96,7 @@ Check two status fields before you read the answer:
 
 The answer is in `data.result.actual.value` only if both fields are `ok`. The store records a receipt for each call that the lifecycle accepts, also for a rejected input. Its identity is in `data.result.receipt_ref`.
 
-[client.py](src/cel-lifecycle/client.py) is a short caller that sends these two requests. It starts `cli.py` once for each request. The service does not send the rule text, the fixed values or the test cases. Step 6 of [WALKTHROUGH.md](docs/WALKTHROUGH.md#6-call-as-a-caller) gives the full command. The `unchanged-caller-client` check in [examples/ci-trigger/run.py](examples/ci-trigger/run.py) runs `client.py` in each `verify.py` run.
+[caller.py](src/lifecycle-core/client/caller.py) is a short caller that sends these two requests. It starts the Go host once for each request. The service does not send the rule text, the fixed values or the test cases. Step 6 of [WALKTHROUGH.md](docs/WALKTHROUGH.md#6-call-as-a-caller) gives the full command. The `unchanged-caller-client` check in [examples/ci-trigger/run.py](examples/ci-trigger/run.py) runs `caller.py` in each `verify.py` run.
 
 ## After the demo
 
@@ -170,7 +170,7 @@ If the author-tools checkout is already available at the documented revision, pa
 The work directory contains `results.json`, command logs and the example stores. To discover the CI function after a successful run:
 
 ```sh
-printf '%s\n' '{"op":"describe","function":"ci.pr_should_run","date":"2026-11-15"}' | python3 -B src/cel-lifecycle/cli.py --repo "$TASK_WORK/reuse/cel/state.git" --context "$TASK_WORK/reuse/cel/caller.json" --runtime "$TASK_WORK/bin/cel-handoff" --work "$TASK_WORK/reuse/cel"
+printf '%s\n' '{"op":"describe","function":"ci.pr_should_run","date":"2026-11-15"}' | "$TASK_WORK/bin/lifecycle-core" --repo "$TASK_WORK/reuse/cel/state.git" --context "$TASK_WORK/reuse/cel/caller.json" --runtime "$TASK_WORK/bin/cel-handoff" --work "$TASK_WORK/reuse/cel"
 ```
 
 To call a function from your own code, see [Call a rule from your service](#call-a-rule-from-your-service). Authors can use the existing CEL prompt/compile/eval tools and submit an exact proposal/base through the same local command boundary.

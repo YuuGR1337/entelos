@@ -1,10 +1,8 @@
 package lifecycle
 
-// Host regressions ported from src/cel-lifecycle/test_lifecycle.py. They use
-// the Git repository that the parity run made with the Go JSONL host.
-// LIFECYCLE_GO_BASELINE names that run's parity.json, and LIFECYCLE_CEL_BINARY
-// names the pinned CEL executable. If LIFECYCLE_GO_REQUIRE_BASELINE is set, a
-// missing baseline is a failure, not a skip.
+// Host regressions ported from the removed Python Host tests. Each test
+// starts from a copy of the Git repository that the lifecycle scenario in
+// scenario_test.go made. The pins name the records of that scenario.
 
 import (
 	"os"
@@ -21,26 +19,8 @@ type baseline struct {
 
 func loadBaseline(t *testing.T) baseline {
 	t.Helper()
-	path, binary := os.Getenv("LIFECYCLE_GO_BASELINE"), os.Getenv("LIFECYCLE_CEL_BINARY")
-	if path == "" || binary == "" {
-		if os.Getenv("LIFECYCLE_GO_REQUIRE_BASELINE") != "" {
-			t.Fatal("LIFECYCLE_GO_BASELINE and LIFECYCLE_CEL_BINARY are required")
-		}
-		t.Skip("no parity baseline")
-	}
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	value, err := Decode(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	g := value.(Object)["go"].(Object)
-	if value.(Object)["status"] != "passed" {
-		t.Fatal("the parity baseline did not pass")
-	}
-	return baseline{repo: g["repo"].(string), contexts: g["contexts"].(string), binary: binary, pins: g["pins"].(Object)}
+	run := requireScenario(t)
+	return baseline{repo: run.driver.repo, contexts: run.driver.work, binary: run.binary, pins: run.pins}
 }
 
 type fixture struct {
@@ -190,6 +170,12 @@ func TestTwoActivationWritersPublishOnlyOneRoot(t *testing.T) {
 	if len(after.State["events"].(Array)) != len(before.State["events"].(Array))+1 ||
 		len(after.State["outbox"].(Object)) != len(before.State["outbox"].(Object))+1 {
 		t.Fatal("not exactly one accepted activation")
+	}
+	requests := after.State["requests"].(Object)
+	_, first := requests["racer-0"]
+	_, second := requests["racer-1"]
+	if first == second {
+		t.Fatal("not exactly one accepted request key")
 	}
 	old, _ := f.store.Read(before.Cursor)
 	if !equal(old.State, before.State) {

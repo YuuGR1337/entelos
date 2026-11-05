@@ -13,8 +13,7 @@ The protocol is unstable. A later milestone states its compatibility.
 | `vectors/session-*.json` | Golden request and response vectors. |
 | `vectors/jcs.json` | RFC 8785 canonical form vectors. |
 | `vectors/envelope-schema.json` | Valid and invalid values for the envelope definitions. |
-| `reference_adapter.py` | The reference adapter in front of the local Host. |
-| `test_protocol.py` | The vector runner. `verify.py` runs it as the `protocol` check. With `--sidecar`, it runs the session vectors through the socket of the Go sidecar (the `sidecar-protocol` check). |
+| `test_protocol.py` | The vector runner. It runs the session vectors through the socket of the Go sidecar. `verify.py` runs it as the `sidecar-protocol` check. |
 | `../lifecycle-core/protocol/` | The Go adapter. `../lifecycle-core/cmd/entelos-sidecar` serves it on a Unix domain socket. |
 
 ## Frame
@@ -94,7 +93,7 @@ A failure:
 | `protocol` | The frame, the envelope or the body schema. The Host did not get the request. |
 | `authority` | The host roles do not permit the operation. |
 | `host` | The Host failed with an unexpected error (`internal_error`). The message has no exception text and no paths. |
-| `lifecycle`, `admission`, `resolve`, `runtime`, `store`, `codec` | The Host and the store. The codes are the existing `Fault` codes in `src/cel-lifecycle`. |
+| `lifecycle`, `admission`, `resolve`, `runtime`, `store`, `codec` | The Host and the store. The codes are the existing `Fault` codes of the lifecycle core in `src/lifecycle-core`. |
 
 The protocol adds four codes: `unsupported_version`, `invalid_frame`, `response_too_large` and `internal_error`. The receiver also sends `internal_error` if a Host result is outside the value domain, for example a float or an object key that is not a string. All other codes are the existing `Fault` codes, for example `invalid_request`, `forbidden`, `out_of_scope`, `invalid_interval`, `stale_revision`, `idempotency_conflict` and `artifact_unavailable`.
 
@@ -117,15 +116,17 @@ The expected response must be equal to the actual response, with these markers:
 | `{"$use":"name"}` | request | The bound value. |
 | `{"$type":"string"}` | expected | Any string. |
 
-The runner also checks that each response frame is in the frame bound. It checks each response against the envelope schema and each success result against the result schema of its operation. It compares the exact payload bytes of each frame with the canonical bytes of its object. It checks that each Host operation has one schema file with the same fields as the Host table. A stub Host with a result over the frame bound must give `response_too_large`. A stub Host that raises an exception, a stub Host that returns a float, and a stub Host that returns `{1: "x"}` must each give one `internal_error` frame.
+The runner also checks that each response frame is in the frame bound. It checks each response against the envelope schema and each success result against the result schema of its operation. It compares the exact payload bytes of each frame with the canonical bytes of its object. Before the sessions, the runner checks its own RFC 8785 encoder on `vectors/jcs.json` and its own schema check on `vectors/envelope-schema.json`.
+
+The Go tests do the checks that need a Host in the process. `schema_test.go` checks that each Host operation has one schema file with the same fields as the Host table. In `protocol/adapter_test.go`, a stub Host with a result over the frame bound must give `response_too_large`. A stub Host that panics, a stub Host that returns a float, and a stub Host that returns a value outside the value domain must each give one `internal_error` frame.
 
 If a session file has an error, the runner keeps its store directory under the work directory and lists it in `kept_stores`. An error record keeps the full exception text and the traceback.
 
 ## Go sidecar
 
-The Go sidecar (#84) passes the same vector files:
+The Go sidecar (#84) passes the vector files:
 
-- With `--sidecar`, `test_protocol.py` starts a new sidecar process for each session file, with the `context` of the file and a new store. Each frame step uses a new connection. After the response, the runner sends a probe frame with the version `9.0`. If the connection is open, the probe gets `unsupported_version`. If the connection is closed, the stream ends. Thus the runner sees `close`. A stream step sends the bytes in parts of `read_size` bytes and reads the output in parts of `write_size` bytes.
+- `test_protocol.py --sidecar <binary> --runtime <cel-handoff>` starts a new sidecar process for each session file, with the `context` of the file and a new store. Each frame step uses a new connection. After the response, the runner sends a probe frame with the version `9.0`. If the connection is open, the probe gets `unsupported_version`. If the connection is closed, the stream ends. Thus the runner sees `close`. A stream step sends the bytes in parts of `read_size` bytes and reads the output in parts of `write_size` bytes.
 - The runner also checks that the socket file has mode 0600, that each payload is canonical, and that the sidecar removes its socket file and exits with status 0 after SIGTERM.
 - A self-test gives the runner a wrong response, a close that the step does not expect and a close that does not occur. The runner must report all three.
 - The Go tests in `src/lifecycle-core/protocol/` run all vector files in the process, with short reads and short writes, and the stub Host checks.
@@ -135,4 +136,3 @@ The Go sidecar (#84) passes the same vector files:
 - The vectors do not run a rule. `describe` with an activation, `qualify`, `load`, `invoke`, `replay` and `restate` are checked only by their schemas. The [sidecar client](../../examples/sidecar-client/README.md) runs `qualify`, `describe`, `load` and `invoke` through the socket with the pinned runtime, but it is an example, not a vector.
 - Record objects inside a result (`report`, `receipt`, `state`) have the type `object` only. The record format version (#78) owns their schemas.
 - The validator supports only the JSON Schema keywords that the files in `schema/` use.
-- The reference adapter does not open a socket. `Adapter.serve` reads frames from a stream. The Go sidecar owns the socket.

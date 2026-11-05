@@ -1,6 +1,6 @@
 # M3 copy proof: findings
 
-This file records what I needed to write the tier-eligibility example from the docs, for [issue #12](https://github.com/mohanraj00/entelos/issues/12). Each finding gives the need, the gap in the docs and the source that I read. The line numbers are for the base commit `4d8d3bb`.
+This file records what I needed to write the tier-eligibility example from the docs, for [issue #12](https://github.com/mohanraj00/entelos/issues/12). Each finding gives the need, the gap in the docs and the source that I read. The line numbers are for the base commit `4d8d3bb`. Issue #95 later removed the Python lifecycle files that this record names, for example `lifecycle.py`, `cli.py` and `client.py`. The paths and line numbers refer to the base commit.
 
 ## Summary
 

@@ -1,7 +1,7 @@
 package lifecycle
 
-// The trusted lifecycle Host. It is a port of src/cel-lifecycle/lifecycle.py
-// and keeps its operations, roles, checks and diagnostics. Internal helpers
+// The trusted lifecycle Host. The specs in src/cel-lifecycle define its
+// operations, roles, checks and diagnostics. Internal helpers
 // stop with a panic that carries a *Fault or a *requestError; Handle and the
 // Transact callback turn that panic back into an error.
 
@@ -61,8 +61,7 @@ func Implementation() (string, error) {
 	sort.Strings(names)
 	var body []byte
 	for _, name := range names {
-		// The identity holds only the core sources. The Python identity
-		// also leaves out its tests.
+		// The identity holds only the core sources, not the tests.
 		if strings.HasSuffix(name, "_test.go") {
 			continue
 		}

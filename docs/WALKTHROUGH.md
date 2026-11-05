@@ -31,12 +31,13 @@ export TASK_WORK="$HOME/scratch/entelos-walk-1"
 python3 -B verify.py --work "$TASK_WORK"
 ```
 
-The last line gives the number of passed and failed checks. A complete run has `"failed": 0`. The runner builds the host at `$TASK_WORK/bin/cel-handoff` and the record bundle at `$TASK_WORK/record-bundle`. If the runner fails, read `$TASK_WORK/results.json` and the logs in `$TASK_WORK/runs/`. The runner does not reuse a work directory. For each new run, use a new directory.
+The last line gives the number of passed and failed checks. A complete run has `"failed": 0`. The runner builds the CEL host at `$TASK_WORK/bin/cel-handoff`, the Go lifecycle host at `$TASK_WORK/bin/lifecycle-core` and the record bundle at `$TASK_WORK/record-bundle`. If the runner fails, read `$TASK_WORK/results.json` and the logs in `$TASK_WORK/runs/`. The runner does not reuse a work directory. For each new run, use a new directory.
 
 Set these names for the subsequent steps:
 
 ```sh
 RT="$TASK_WORK/bin/cel-handoff"
+HOST="$TASK_WORK/bin/lifecycle-core"
 BUNDLE="$TASK_WORK/record-bundle"
 ```
 
@@ -108,12 +109,12 @@ A Go service can also load a bundle in its own process. It calls `handoff.Load` 
 
 ## 5. Run the dated lifecycle
 
-[scenario.py](../src/cel-lifecycle/scenario.py) sends each operation through the JSONL boundary in [cli.py](../src/cel-lifecycle/cli.py). It writes a new local Git store and one context file for each actor:
+[scenario.py](../src/lifecycle-core/client/scenario.py) sends each operation through the JSONL boundary of the Go lifecycle host [cmd/lifecycle-core](../src/lifecycle-core/cmd/lifecycle-core/main.go). It writes a new local Git store and one context file for each actor:
 
 ```sh
 LIFE="$TASK_WORK/walk"
-python3 -B src/cel-lifecycle/scenario.py --work "$LIFE" --runtime "$RT" --bundle "$BUNDLE" \
-  --fixture src/cel-lifecycle/fixtures/lifecycle-scenario.json
+python3 -B src/lifecycle-core/client/scenario.py --work "$LIFE" --runtime "$RT" --bundle "$BUNDLE" \
+  --fixture src/cel-lifecycle/fixtures/lifecycle-scenario.json --host "$HOST"
 ```
 
 The output is `{"status": "passed", "checks": 10, "error": null}`. The full trace is in `$LIFE/scenario-results.json`. Print one line for each operation:
@@ -159,21 +160,21 @@ The fixture `expected` block states the five answers before the run: `true`, `tr
 
 ## 6. Call as a caller
 
-[client.py](../src/cel-lifecycle/client.py) discovers the selected callable, then invokes it. It reads no CEL source, fixed value or case:
+[caller.py](../src/lifecycle-core/client/caller.py) discovers the selected callable, then invokes it. It reads no CEL source, fixed value or case:
 
 ```sh
-python3 -B src/cel-lifecycle/client.py --repo "$LIFE/state.git" --context "$LIFE/caller.json" \
+python3 -B src/lifecycle-core/client/caller.py --host "$HOST" --repo "$LIFE/state.git" --context "$LIFE/caller.json" \
   --runtime "$RT" --work "$LIFE" --key walk-november
 ```
 
-`client.py` sends two JSON requests to `cli.py`: `describe`, then `invoke`. [Call a rule from your service](../README.md#call-a-rule-from-your-service) shows the two requests. The `unchanged-caller-client` check in [run.py](../examples/ci-trigger/run.py) runs `client.py` in each `verify.py` run.
+`caller.py` sends two JSON requests to the Go host: `describe`, then `invoke`. [Call a rule from your service](../README.md#call-a-rule-from-your-service) shows the two requests. The `unchanged-caller-client` check in [run.py](../examples/ci-trigger/run.py) runs `caller.py` in each `verify.py` run.
 
 The default date is 2026-11-15 and the default input is `{"state":"reviewed","archived":false}`. The result has `"status":"ok"` and the value `false`, because the correction is active and loaded. The response also contains the new receipt.
 
 The worker in this example has one preparation slot. The last load was for November. An October call therefore gives a refusal, not an answer:
 
 ```sh
-python3 -B src/cel-lifecycle/client.py --repo "$LIFE/state.git" --context "$LIFE/caller.json" \
+python3 -B src/lifecycle-core/client/caller.py --host "$HOST" --repo "$LIFE/state.git" --context "$LIFE/caller.json" \
   --runtime "$RT" --work "$LIFE" --key walk-october --date 2026-10-15 --inputs '{"state":"ready","archived":false}'
 ```
 
@@ -184,7 +185,7 @@ The result is `revision_not_loaded`. A host that serves more than one date at th
 Read the retained receipt of the November call before the correction:
 
 ```sh
-cli() { python3 -B src/cel-lifecycle/cli.py --repo "$LIFE/state.git" --context "$LIFE/$1.json" --runtime "$RT" --work "$LIFE"; }
+cli() { "$HOST" --repo "$LIFE/state.git" --context "$LIFE/$1.json" --runtime "$RT" --work "$LIFE"; }
 OLD=$(python3 -B -c 'import json,sys; print(json.load(open(sys.argv[1]))["pins"]["old_receipt"])' "$LIFE/scenario-results.json")
 printf '{"op":"receipt","receipt_ref":"%s"}\n' "$OLD" | cli reader
 ```

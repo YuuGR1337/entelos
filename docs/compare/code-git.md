@@ -73,7 +73,7 @@ Status values: **built in** (the tool does it), **other tools** (possible with a
 
 ## Ordinary functions under the Entelos lifecycle
 
-[ordinary.py](../../examples/ci-trigger/ordinary.py) has three frozen Python functions for the PR CI example: `initial`, `amendment` and `correction`. The CI example runs them through the same lifecycle port as the CEL bundles. Thus the lifecycle rows above do not need CEL. They need a runtime that the lifecycle can identify and call.
+[ordinary.py](../../examples/ci-trigger/ordinary.py) has three frozen Python functions for the PR CI example: `initial`, `amendment` and `correction`. The CI example runs them through the same lifecycle port as the CEL bundles: a small executable gives them the CLI protocol of the CEL runtime. Thus the lifecycle rows above do not need CEL. They need a runtime that the lifecycle can identify and call.
 
 These functions have a different profile and build from CEL. They do not implement the CEL parser or cost limits. As [INTEGRATION.md](../INTEGRATION.md) says, a common lifecycle in both paths cannot show that it is better than other lifecycle systems.
 

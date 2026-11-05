@@ -1,7 +1,7 @@
 package lifecycle
 
 // The CEL runtime adapter calls the pinned CEL executable with explicit
-// bundles, as the Python reference does. The Host never evaluates CEL itself.
+// bundles. The Host never evaluates CEL itself.
 
 import (
 	"bytes"

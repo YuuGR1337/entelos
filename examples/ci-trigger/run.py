@@ -6,21 +6,20 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
+import shlex
 import subprocess
 import sys
-from support import LIFE,ROOT,Host,GitStore,CELRuntime,Driver,Fault,encode,decode,content_ref,envelope,fixture
-from scenario import demonstrate as original_demonstrate
+from support import LIFE,ROOT,Fault,encode,decode,fixture,handle,read_store,record,root,host_sources
+from scenario import Driver as RecordDriver,demonstrate as original_demonstrate
 from demo import CIDriver,demonstrate
 from adapter import Ingress,project,link,verify_link
-from ordinary import OrdinaryRuntime
 
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('--work',type=Path,required=True);p.add_argument('--cel-binary',type=Path,required=True);p.add_argument('--author-binary',type=Path,required=True);p.add_argument('--record-bundle',type=Path,required=True)
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('--work',type=Path,required=True);p.add_argument('--cel-binary',type=Path,required=True);p.add_argument('--author-binary',type=Path,required=True);p.add_argument('--record-bundle',type=Path,required=True);p.add_argument('--host',type=Path,required=True,help='Go lifecycle-core executable')
 a=p.parse_args();w=a.work.resolve()
 SOURCE=ROOT.parents[1]
 if w==SOURCE or SOURCE in w.parents:p.error('work must be outside the source tree')
 if w.exists():p.error('work directory exists; preserve previous runs')
-w.mkdir(parents=True);(w/'tmp').mkdir();os.environ['TMPDIR']=str(w/'tmp');os.environ['PYTHONDONTWRITEBYTECODE']='1';os.environ['CEL_LIFECYCLE_SOURCE']=str(LIFE)
+w.mkdir(parents=True);(w/'tmp').mkdir();os.environ['TMPDIR']=str(w/'tmp');os.environ['PYTHONDONTWRITEBYTECODE']='1';os.environ['LIFECYCLE_CLIENT_SOURCE']=str(LIFE)
 for key in list(os.environ):
     if key.startswith('GIT_'):os.environ.pop(key)
 checks=[];commands=[];traces={};pins={};errors=[];direct_operations=[]
@@ -38,43 +37,44 @@ def fault(code,fn):
         return e.record()
     raise AssertionError('expected '+code)
 
-def direct(name,host,request,expected='ok'):
-    try:
-        result=host.handle(request);response={'status':'ok','data':result}
-    except Fault as e:
-        response=e.record();result=response
+def direct(name,context,request,expected='ok'):
+    """Send one request to a new Go host process on the shared CI store, with a context file of the host."""
+    response,_=handle(a.host,ci.repo,context,a.cel_binary,w,request)
+    result=response.get('data',response) if response['status']=='ok' else response
     direct_operations.append({'name':name,'request':request,'response':response,'expected_status':expected})
     if response['status']!=expected:raise AssertionError(name+': '+str(response))
     return result
 
 try:
     decl=fixture();inventory=decode((SOURCE/'checksums.json').read_bytes())
-    life_files=['git_store.py','cel_runtime.py','lifecycle.py','cli.py']
-    life_hashes={x:hashlib.sha256((LIFE/x).read_bytes()).hexdigest() for x in life_files}
-    cel=LIFE.parent/'cel-handoff';cel_files=['handoff.go','json.go','identity.go','cmd/cel-handoff/main.go','go.mod','go.sum']
+    core=SOURCE/'src/lifecycle-core';life_files=host_sources()
+    life_hashes={x:hashlib.sha256((core/x).read_bytes()).hexdigest() for x in life_files}
+    cel=SOURCE/'src/cel-handoff';cel_files=['handoff.go','json.go','identity.go','cmd/cel-handoff/main.go','go.mod','go.sum']
     cel_hashes={x:hashlib.sha256((cel/x).read_bytes()).hexdigest() for x in cel_files}
-    check('unchanged-production-sources','Do exported shared sources retain their reviewed checksums?',all(inventory['src/cel-lifecycle/'+x]==v for x,v in life_hashes.items()) and all(inventory['src/cel-handoff/'+x]==v for x,v in cel_hashes.items()),{'lifecycle':life_hashes,'cel':cel_hashes,'changed_shared_files':[]})
+    check('unchanged-production-sources','Do exported shared sources retain their reviewed checksums?',all(inventory['src/lifecycle-core/'+x]==v for x,v in life_hashes.items()) and all(inventory['src/cel-handoff/'+x]==v for x,v in cel_hashes.items()),{'lifecycle':life_hashes,'cel':cel_hashes,'changed_shared_files':[]})
     actual=decode(subprocess.check_output([str(a.cel_binary),'-build']));deps={x['Path']:x['Version'] for x in actual['build']['Deps']}
     check('pinned-runtime','Does the freshly identified host use the pinned CEL dependency closure?',deps.get('cel.dev/cel-go')=='v0.32.0' and deps.get('cel.dev/expr')=='v0.25.3',actual)
-    original=Driver(LIFE,w/'original',a.cel_binary,decode((LIFE/'fixtures/lifecycle-scenario.json').read_bytes()))
+    original=RecordDriver(w/'original',a.cel_binary,decode((SOURCE/'src/cel-lifecycle/fixtures/lifecycle-scenario.json').read_bytes()),a.host.resolve())
     original_pins=original_demonstrate(original,a.record_bundle);traces['original']={'trace':original.trace,'checks':original.checks,'pins':original_pins}
-    ci=CIDriver(w/'cel',a.cel_binary,'cel',original.repo);ci_pins=demonstrate(ci,a.cel_binary,seeded=True);traces['cel']={'trace':ci.trace,'checks':ci.checks,'pins':ci_pins}
-    py=CIDriver(w/'ordinary',a.cel_binary,'ordinary');py_pins=demonstrate(py,a.cel_binary);traces['ordinary']={'trace':py.trace,'checks':py.checks,'pins':py_pins}
+    ci=CIDriver(w/'cel',a.cel_binary,'cel',a.host.resolve(),original.repo);ci_pins=demonstrate(ci,a.cel_binary,seeded=True);traces['cel']={'trace':ci.trace,'checks':ci.checks,'pins':ci_pins}
+    # The ordinary runtime runs with this interpreter, so its build identity equals the identity in the proposals.
+    ordinary=w/'bin/ordinary-runtime';ordinary.parent.mkdir()
+    ordinary.write_text('#!/bin/sh\nexec %s -B %s "$@"\n'%(shlex.quote(sys.executable),shlex.quote(str(ROOT/'ordinary.py'))));ordinary.chmod(0o755)
+    py=CIDriver(w/'ordinary',ordinary,'ordinary',a.host.resolve());py_pins=demonstrate(py,a.cel_binary);traces['ordinary']={'trace':py.trace,'checks':py.checks,'pins':py_pins}
     check('same-full-completion-targets','Can both CEL and ordinary frozen functions complete the same lifecycle targets?',all(x['passed'] for d in (ci,py) for x in d.checks),{'cel':ci.checks,'ordinary':py.checks})
     check('behavior-baseline','Does ordinary code match independently stated correction/replay outcomes?',ci_pins['old_answer']['value'] is py_pins['old_answer']['value'] is False and ci_pins['new_answer']['value'] is py_pins['new_answer']['value'] is True,{'cel':ci_pins,'ordinary':py_pins})
     # The original and new function are now in one root history, with distinct logical worker configuration.
-    store=GitStore(ci.repo);old_context=decode((original.work/'reader.json').read_bytes());old_caller_context=decode((original.work/'caller.json').read_bytes())
-    old_reader=Host(store,CELRuntime(a.cel_binary,w/'tmp'),old_context);old_caller=Host(store,CELRuntime(a.cel_binary,w/'tmp'),old_caller_context)
-    replay=direct('original-replay-after-ci',old_reader,{'op':'replay','expected_revision':store.root(),'request_key':'record-after-ci:replay','receipt_ref':original_pins['old_receipt'],'reason':'verify coexisting consumer did not change old closure'})
-    old_snapshot=store.read().get(original_pins['correction_snapshot'],'snapshot')
-    old_call=direct('original-current-call-after-ci',old_caller,{'op':'invoke','expected_revision':store.root(),'request_key':'record-after-ci:invoke','function':'record.visible','date':'2026-11-15','expected_bundle_ref':old_snapshot['bundle_ref'],'inputs':{'state':'reviewed','archived':False}})
+    old_reader=original.work/'reader.json';old_caller=original.work/'caller.json'
+    replay=direct('original-replay-after-ci',old_reader,{'op':'replay','expected_revision':root(ci.repo),'request_key':'record-after-ci:replay','receipt_ref':original_pins['old_receipt'],'reason':'verify coexisting consumer did not change old closure'})
+    old_snapshot=record(read_store(ci.repo),original_pins['correction_snapshot'],'snapshot')
+    old_call=direct('original-current-call-after-ci',old_caller,{'op':'invoke','expected_revision':root(ci.repo),'request_key':'record-after-ci:invoke','function':'record.visible','date':'2026-11-15','expected_bundle_ref':old_snapshot['bundle_ref'],'inputs':{'state':'reviewed','archived':False}})
     check('two-consumer-coexistence','Does new consumer history preserve the first consumer resolution, preparation and replay?',replay['result']['actual']['value'] is True and old_call['result']['actual']['value'] is False,{'original_replay':replay,'original_current_call':old_call})
     # Probe the existing one-slot worker model, then restore the original worker preparation.
     ci_worker_context=decode(ci.contexts['worker'].read_bytes());ci_worker_context['worker']='local-worker'
-    overloaded=Host(store,CELRuntime(a.cel_binary,w/'tmp'),ci_worker_context)
-    direct('shared-worker-load-probe',overloaded,{'op':'load','expected_revision':store.root(),'request_key':'worker-slot:ci-load','function':decl['function'],'date':'2026-11-15'})
-    slot_error=direct('original-worker-slot-error',old_caller,{'op':'invoke','expected_revision':store.root(),'request_key':'worker-slot:old-call','function':'record.visible','date':'2026-11-15','expected_bundle_ref':old_snapshot['bundle_ref'],'inputs':{'state':'reviewed','archived':False}},expected='revision_not_loaded')
-    direct('restore-original-worker',Host(store,CELRuntime(a.cel_binary,w/'tmp'),decode((original.work/'worker.json').read_bytes())),{'op':'load','expected_revision':store.root(),'request_key':'worker-slot:restore','function':'record.visible','date':'2026-11-15'})
+    overloaded=w/'ci-worker-local.json';overloaded.write_bytes(encode(ci_worker_context))
+    direct('shared-worker-load-probe',overloaded,{'op':'load','expected_revision':root(ci.repo),'request_key':'worker-slot:ci-load','function':decl['function'],'date':'2026-11-15'})
+    slot_error=direct('original-worker-slot-error',old_caller,{'op':'invoke','expected_revision':root(ci.repo),'request_key':'worker-slot:old-call','function':'record.visible','date':'2026-11-15','expected_bundle_ref':old_snapshot['bundle_ref'],'inputs':{'state':'reviewed','archived':False}},expected='revision_not_loaded')
+    direct('restore-original-worker',original.work/'worker.json',{'op':'load','expected_revision':root(ci.repo),'request_key':'worker-slot:restore','function':'record.visible','date':'2026-11-15'})
     check('worker-configuration-burden','Does reuse require distinct acknowledgement slots instead of a shared cache claim?',slot_error['status']=='revision_not_loaded',slot_error)
     # Projection rejects malformed transport separately from a valid false computation result.
     raw=(ROOT/'fixtures/ready-review-envelope.json').read_bytes();valid=decode(raw);ingress=Ingress(True,decl['repository']);projection_errors=[]
@@ -105,16 +105,14 @@ try:
         observed=json.loads(proc.stdout);author.append({'stage':stage,'result':observed})
         check('author-'+stage,'Can existing authoring tools compile/evaluate this policy and literal expected outcomes?',proc.returncode==0 and all(x['status']=='pass' for x in observed['testResults']) and not observed.get('skippedTestCases'),observed)
     # Ordinary caller CLI is reused unchanged for the second declared contract.
-    client=command('source-free-client',[sys.executable,'-B',LIFE/'client.py','--repo',ci.repo,'--context',ci.contexts['caller'],'--runtime',a.cel_binary,'--work',ci.work,'--key','ci-client:ready-review','--function',decl['function'],'--date','2026-11-15','--inputs',json.dumps(decl['original_inputs'])])
+    client=command('source-free-client',[sys.executable,'-B',LIFE/'caller.py','--host',a.host,'--repo',ci.repo,'--context',ci.contexts['caller'],'--runtime',a.cel_binary,'--work',ci.work,'--key','ci-client:ready-review','--function',decl['function'],'--date','2026-11-15','--inputs',json.dumps(decl['original_inputs'])])
     client_result=json.loads(client.stdout);check('unchanged-caller-client','Can the original generic client call a new declared function without source/tests/parameters?',client.returncode==0 and client_result['data']['result']['actual']['value'] is True,client_result)
     for name,driver in [('cel',ci),('ordinary',py)]:
         fsck=command('fsck-'+name,['git','--git-dir='+str(driver.repo),'fsck','--full','--no-dangling'])
         check('fsck-'+name,'Is the accepted multi-consumer/baseline history intact?',fsck.returncode==0,{'exit_code':fsck.returncode,'stderr':fsck.stderr})
-        view=GitStore(driver.repo).read();objects=[]
-        for path,oid in sorted(view.entries.items()):
-            if path.startswith('o-'):
-                body=view.store.git('cat-file','blob',oid);mime,raw_body=body.split(b'\0',1);objects.append({'ref':'sha256:'+path[2:],'media_type':mime.decode(),'body_utf8':raw_body.decode()})
-        (w/(name+'-store-export.json')).write_bytes(encode({'cursor':view.cursor,'state':view.state,'objects':objects}))
+        view=read_store(driver.repo)
+        objects=[{'ref':ref,'media_type':mime,'body_utf8':raw_body.decode()} for ref,(mime,raw_body) in sorted(view['objects'].items())]
+        (w/(name+'-store-export.json')).write_bytes(encode({'cursor':view['cursor'],'state':view['state'],'objects':objects}))
     pins={'original':original_pins,'cel':ci_pins,'ordinary':py_pins}
 except Exception as e:errors.append(repr(e))
 finally:

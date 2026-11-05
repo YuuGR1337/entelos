@@ -16,7 +16,7 @@ The reference has three local call paths. It has no network server and no sideca
 |---|---|---|---|
 | Go library | Call `handoff.Load` with the bundle files, then `Bundle.Run` with one JSON request. | Nothing. It gives the answer only. | [handoff.go](../src/cel-handoff/handoff.go) |
 | Rule process | Start `cel-handoff -bundle DIR run`. Write one JSON request on each stdin line, and read one response on each stdout line. | Nothing. It gives the answer only. | [main.go](../src/cel-handoff/cmd/cel-handoff/main.go) |
-| Lifecycle process | Start [cli.py](../src/cel-lifecycle/cli.py) and write JSON lines. Send `describe`, then `invoke` with the expected bundle, the expected revision and a request key. | A receipt in the Git store. | [client.py](../src/cel-lifecycle/client.py), [WALKTHROUGH.md](WALKTHROUGH.md) |
+| Lifecycle process | Start the Go host [lifecycle-core](../src/lifecycle-core/cmd/lifecycle-core/main.go) and write JSON lines. Send `describe`, then `invoke` with the expected bundle, the expected revision and a request key. | A receipt in the Git store. | [caller.py](../src/lifecycle-core/client/caller.py), [WALKTHROUGH.md](WALKTHROUGH.md) |
 
 Only the lifecycle path gives replay, restatement and a receipt. The first two paths evaluate a rule, but they do not keep a history.
 
@@ -24,7 +24,7 @@ The cost of each call is not measured. This page makes no speed claim. The sourc
 
 - The Go library runs in the service process. It has no process start and no store write.
 - The rule process runs one bundle for its full life. A new bundle needs a new process.
-- For each `invoke`, the lifecycle starts a new `cel-handoff` process, with a 15 second timeout ([cel_runtime.py](../src/cel-lifecycle/cel_runtime.py)). It also writes the receipt to the Git store with a compare-and-swap on one root ref ([git_store.py](../src/cel-lifecycle/git_store.py)).
+- For each `invoke`, the lifecycle starts a new `cel-handoff` process, with a 15 second timeout ([runtime.go](../src/lifecycle-core/runtime.go)). It also writes the receipt to the Git store with a compare-and-swap on one root ref ([gitstore.go](../src/lifecycle-core/gitstore.go)).
 
 If you need a network service, the application must supply it. It must also supply authentication. See [INTEGRATION.md](INTEGRATION.md) and [SECURITY.md](../SECURITY.md).
 
@@ -56,7 +56,7 @@ The demo shows this sequence. [compare/code-git.md](compare/code-git.md) runs th
 
 The effective date is the interval in the approved source. It is not the time of the commit, the deploy or the call. Each interval includes its start date and excludes its end date. The caller sends the date of the question in the `date` field.
 
-In the demo, the correction has the interval 2026-11-01 to 2026-12-01. The scenario does these steps ([scenario.py](../src/cel-lifecycle/scenario.py)):
+In the demo, the correction has the interval 2026-11-01 to 2026-12-01. The scenario does these steps ([scenario.py](../src/lifecycle-core/client/scenario.py)):
 
 1. A reviewer suspends the wrong amendment on its interval. While the suspension applies, a call for 2026-11-15 gets `out_of_scope`. There is no fallback to the initial rule (`suspension-no-fallback`).
 2. A reviewer activates the correction. The activation names the amendment and the suspension as its targets.

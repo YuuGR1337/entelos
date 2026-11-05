@@ -1,7 +1,13 @@
-"""Ordinary typed decision functions under the same lifecycle port, for comparison only."""
+#!/usr/bin/env python3
+"""Ordinary typed decision functions under the same lifecycle port, for comparison only.
+
+The Go lifecycle host runs this file as its runtime executable, with the command line of the
+pinned CEL executable: "-build", or "-bundle DIR [-cases FILE] describe|run|check".
+"""
 from pathlib import Path
 import sys
 from support import Fault,encode,decode,content_ref,envelope,MIMES
+FILENAMES={'manifest':'manifest.json','environment':'env.json','source':'rule.cel','fixed':'fixed.json'}
 
 def initial(action:str,base_branch:str,draft:bool,target_branch:str)->bool:
     return not draft and base_branch==target_branch and action in ('opened','synchronize')
@@ -56,3 +62,26 @@ class OrdinaryRuntime:
                 results.append({'case':case['case'],'passed':passed,'actual':actual})
             return {'status':'passed' if results and all(x['passed'] for x in results) else 'failed','bundle_ref':ref,'implementation_ref':self.build(),'cases':results}
         raise Fault('invalid_operation','ordinary runtime operation is unsupported')
+
+def main(args):
+    """Write one JSON value to stdout. A fault exits with 1 and writes its record."""
+    runtime=OrdinaryRuntime()
+    try:
+        if args==['-build']:
+            value={'implementation_ref':runtime.build()}
+        else:
+            if len(args)<3 or args[0]!='-bundle':raise Fault('invalid_operation','usage: -bundle DIR [-cases FILE] COMMAND','ordinary-runtime')
+            directory=Path(args[1]);rest=args[2:];cases=None
+            if rest[0]=='-cases':
+                if len(rest)<3:raise Fault('invalid_operation','-cases needs a file and a command','ordinary-runtime')
+                cases=decode(Path(rest[1]).read_bytes());rest=rest[2:]
+            if len(rest)!=1:raise Fault('invalid_operation','one command is required','ordinary-runtime')
+            files={key:(directory/name).read_bytes() for key,name in FILENAMES.items()}
+            # The host sends {"bundle_ref":...,"inputs":...}. The ordinary functions get the canonical input bytes.
+            inputs=encode(decode(sys.stdin.buffer.read())['inputs']) if rest[0]=='run' else None
+            value=runtime.execute(files,rest[0],inputs,cases)
+    except Fault as e:
+        sys.stdout.buffer.write(encode(e.record()));return 1
+    sys.stdout.buffer.write(encode(value));return 0
+
+if __name__=='__main__':raise SystemExit(main(sys.argv[1:]))

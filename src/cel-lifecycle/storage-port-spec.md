@@ -1,11 +1,11 @@
 # Storage port specification
 
-This file specifies the storage port that the Host uses. [storage-port.md](storage-port.md) gives the obligations for a future database adapter. The JSON vectors in [conformance/storage/](conformance/storage/) test this specification. The harness [test_storage_port.py](test_storage_port.py) runs them against two adapters:
+This file specifies the storage port that the Host uses. [storage-port.md](storage-port.md) gives the obligations for a future database adapter. The JSON vectors in [conformance/storage/](conformance/storage/) test this specification. The Go harness `TestStoragePortVectors` in [vectors_test.go](../lifecycle-core/vectors_test.go) runs them against two adapters:
 
-- `GitStore` in [git_store.py](git_store.py), one local bare Git repository.
-- `MemoryStore` in [memory_store.py](memory_store.py), process memory only.
+- `GitStore` in [gitstore.go](../lifecycle-core/gitstore.go), one local bare Git repository.
+- `MemoryStore` in [memstore.go](../lifecycle-core/memstore.go), process memory only.
 
-The vectors are language-neutral. A harness in a different language, for example Go, can run the same files.
+The vectors are language-neutral. A harness in a different language can run the same files.
 
 ## Terms
 
@@ -126,4 +126,4 @@ Each expected value is a literal in the vector. A script that uses only SHA-256 
 
 ## Limits
 
-Passing the vectors does not show durability, crash recovery, performance or behavior under real concurrent processes. `MemoryStore` keeps no data after the process stops. The vectors test the port contract, not the Host commands on top of it. Only `GitStore` runs the Host conformance in `test_lifecycle.py`.
+Passing the vectors does not show durability, crash recovery, performance or behavior under real concurrent processes. `MemoryStore` keeps no data after the process stops. The vectors test the port contract, not the Host commands on top of it. Only `GitStore` runs the Host conformance in [host_test.go](../lifecycle-core/host_test.go).

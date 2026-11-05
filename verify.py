@@ -24,8 +24,8 @@ env={k:v for k,v in os.environ.items() if not k.startswith('GIT_')}|{
  'GOCACHE':str(w/'cache/build'),'GOMODCACHE':str(w/'cache/mod'),'GOPATH':str(w/'cache/gopath'),
  'GOTMPDIR':str(w/'tmp'),'TMPDIR':str(w/'tmp'),'TEST_TELEMETRY_DIR':str(w/'cache/telemetry'),
  'GOENV':'off','GOWORK':'off','GOFLAGS':'','GOTOOLCHAIN':'local','PYTHONDONTWRITEBYTECODE':'1',
- 'CEL_LIFECYCLE_SOURCE':str(ROOT/'src/cel-lifecycle'),
- 'LIFECYCLE_TEST_WORK':str(w/'conformance'),'LIFECYCLE_CEL_BINARY':str(w/'bin/cel-handoff'),
+ 'LIFECYCLE_CLIENT_SOURCE':str(ROOT/'src/lifecycle-core/client'),'LIFECYCLE_HOST':str(w/'bin/lifecycle-core'),
+ 'LIFECYCLE_CEL_BINARY':str(w/'bin/cel-handoff'),
  'LIFECYCLE_CEL_BUNDLE':str(w/'record-bundle'),'LIFECYCLE_FIXTURE':str(ROOT/'src/cel-lifecycle/fixtures/lifecycle-scenario.json'),
  'EXPORT_TEST_WORK':str(w/'boundaries'),'PROTOCOL_TEST_WORK':str(w/'protocol'),'QUICKSTART_TEST_WORK':str(w/'quickstart-failures'),'DECISION_EXPORT_SOURCE':str(ROOT)}
 for key in list(os.environ):
@@ -76,36 +76,25 @@ try:
  check('prepare-record','Can a fresh bundle bind the exported build identity?',prepared.returncode==0,{'exit_code':prepared.returncode})
  syntax=run('python-syntax',[sys.executable,'-B','-c','import pathlib; [compile(p.read_bytes(),str(p),"exec") for p in pathlib.Path(".").rglob("*.py")]'])
  check('syntax','Are the exported Python sources syntactically valid?',syntax.returncode==0,{'exit_code':syntax.returncode})
- boundaries=run('export-boundaries',[sys.executable,'-B',ROOT/'tests/test_export_boundaries.py'])
- boundary_results=json.loads((w/'boundaries/test-results.json').read_text())
- check('export-boundaries','Do oversized stream and audit-identity regressions pass?',boundaries.returncode==0 and boundary_results['successful'],boundary_results)
- storage=run('storage-vectors',[sys.executable,'-B',ROOT/'src/cel-lifecycle/test_storage_port.py','--work',w/'storage'])
- storage_path=w/'storage/test-results.json';storage_results=json.loads(storage_path.read_text()) if storage_path.exists() else {'successful':False,'error':'test_storage_port.py wrote no test-results.json','stderr':storage.stderr}
- check('storage-vectors','Do the Git and in-memory adapters pass every storage port vector?',storage.returncode==0 and storage_results['successful'] and set(storage_results.get('summary',{}))=={'git','memory'},
-       {'exit_code':storage.returncode,'vectors':storage_results.get('vectors'),'summary':storage_results.get('summary'),'problems':storage_results.get('problems'),'adapters':storage_results.get('adapters'),'stderr':storage.stderr})
- tests=run('lifecycle-tests',[sys.executable,'-B',ROOT/'src/cel-lifecycle/test_lifecycle.py'])
- test_results=json.loads((w/'conformance/test-results.json').read_text())
- check('lifecycle','Do local lifecycle/concurrency/recovery/replay checks pass from the export alone?',tests.returncode==0 and test_results['successful'],test_results)
  core=ROOT/'src/lifecycle-core'
+ # The export boundary check and the examples use the Go JSONL host, so build it first.
  go_core=[run('go-core-build',['go','build','-mod=readonly','-trimpath','-buildvcs=false','-o',w/'bin/lifecycle-core','./cmd/lifecycle-core'],core)]
- if go_core[0].returncode==0:
-  go_core.append(run('go-core-parity',[sys.executable,'-B',core/'tools/parity.py','--work',w/'go-core','--runtime',w/'bin/cel-handoff','--bundle',w/'record-bundle','--fixture',env['LIFECYCLE_FIXTURE'],'--host',w/'bin/lifecycle-core']))
- parity_path=w/'go-core/parity.json';parity=json.loads(parity_path.read_text()) if parity_path.exists() else {'status':'failed'}
- # Run the tests and vet also after a parity failure, so that the evidence is complete.
- # The host tests need the parity repository; without it they fail, because the baseline is required.
- env.update(LIFECYCLE_GO_REQUIRE_BASELINE='1')
- if parity_path.exists():env.update(LIFECYCLE_GO_BASELINE=str(parity_path))
+ boundaries=run('export-boundaries',[sys.executable,'-B',ROOT/'tests/test_export_boundaries.py'])
+ boundary_path=w/'boundaries/test-results.json'
+ boundary_results=json.loads(boundary_path.read_text()) if boundary_path.exists() else {'successful':False,'error':'test_export_boundaries.py wrote no test-results.json','stderr':boundaries.stderr}
+ check('export-boundaries','Do oversized stream and audit-identity regressions pass?',boundaries.returncode==0 and boundary_results['successful'],boundary_results)
+ # The Go tests run the lifecycle scenario, the storage port vectors and the Host checks.
+ # LIFECYCLE_REQUIRE_SCENARIO makes a skipped scenario a failure. The scenario writes its checks and pins to the results file.
+ (w/'go-core').mkdir(parents=True,exist_ok=True);scenario_path=w/'go-core/scenario-results.json'
+ env.update(LIFECYCLE_REQUIRE_SCENARIO='1',LIFECYCLE_SCENARIO_RESULTS=str(scenario_path))
  go_core.append(run('go-core-tests',['go','test','-mod=readonly','-count=1','./...'],core))
  go_core.append(run('go-core-vet',['go','vet','-mod=readonly','./...'],core))
- check('go-lifecycle-core','Does the Go lifecycle core build, match the Python core on the scenario, and pass its tests and vet?',
-       parity['status']=='passed' and len(go_core)==4 and all(x.returncode==0 for x in go_core),
-       {'stages':{c['name']:c['exit_code'] for c in commands[-len(go_core):]},
-        'parity':{k:parity.get(k) for k in ['status','steps','first_difference','same_snapshot_refs']}})
- protocol=run('protocol-vectors',[sys.executable,'-B',ROOT/'src/protocol/test_protocol.py'])
- protocol_path=w/'protocol/test-results.json'
- protocol_results=json.loads(protocol_path.read_text()) if protocol_path.exists() else {'successful':False,'error':'test_protocol.py wrote no test-results.json','exit_code':protocol.returncode,'stderr':protocol.stderr}
- check('protocol','Does the reference adapter pass the versioned wire protocol vectors?',protocol.returncode==0 and protocol_results['successful'],protocol_results)
- # The Go sidecar runs the same session vector files through its Unix socket. Its JCS, schema and stub Host tests are in go-core-tests.
+ scenario=json.loads(scenario_path.read_text()) if scenario_path.exists() else {'status':'failed','error':'the Go scenario wrote no results'}
+ check('go-lifecycle-core','Does the Go lifecycle core build, pass the scenario with the fixture values, and pass its tests and vet?',
+       scenario.get('status')=='passed' and bool(scenario.get('checks')) and all(x['passed'] for x in scenario['checks']) and len(go_core)==3 and all(x.returncode==0 for x in go_core),
+       {'stages':{c['name']:c['exit_code'] for c in commands if c['name'].startswith('go-core-')},
+        'scenario':{k:scenario.get(k) for k in ['status','error','steps']}|{'checks':[x['name'] for x in scenario.get('checks',[]) if x.get('passed')]}})
+ # The Go sidecar runs the session vector files through its Unix socket. Its stub Host and schema table tests are in go-core-tests.
  sidecar=[run('build-sidecar',['go','build','-mod=readonly','-trimpath','-buildvcs=false','-o',w/'bin/entelos-sidecar','./cmd/entelos-sidecar'],core)]
  if sidecar[0].returncode==0:
   sidecar.append(run('sidecar-vectors',[sys.executable,'-B',ROOT/'src/protocol/test_protocol.py','--sidecar',w/'bin/entelos-sidecar','--runtime',w/'bin/cel-handoff','--work',w/'sidecar-protocol']))
@@ -121,10 +110,10 @@ try:
  client_results=json.loads(client_path.read_text()) if client_path.exists() else {'status':'failed','error':'run.py wrote no results.json','stderr':client.stderr}
  check('sidecar-client','Does a client that talks only to the sidecar socket complete propose, qualify, decide, activate and invoke?',
        client.returncode==0 and client_results['status']=='passed',{k:client_results.get(k) for k in ['status','error','checks']})
- demo=run('consumer-reuse',[sys.executable,'-B',ROOT/'examples/ci-trigger/run.py','--work',w/'reuse','--cel-binary',w/'bin/cel-handoff','--author-binary',w/'bin/cel-expr','--record-bundle',w/'record-bundle'])
+ demo=run('consumer-reuse',[sys.executable,'-B',ROOT/'examples/ci-trigger/run.py','--work',w/'reuse','--cel-binary',w/'bin/cel-handoff','--author-binary',w/'bin/cel-expr','--record-bundle',w/'record-bundle','--host',w/'bin/lifecycle-core'])
  reuse=json.loads((w/'reuse/results.json').read_text())
  check('two-consumers-and-baseline','Do both consumer loops and the ordinary-code comparison pass?',demo.returncode==0 and reuse['status']=='passed',{'status':reuse['status'],'checks':reuse['checks'],'measurements':reuse['measurements'],'errors':reuse['errors']})
- tier=run('tier-eligibility',[sys.executable,'-B',ROOT/'examples/tier-eligibility/run.py','--work',w/'tier','--cel-binary',w/'bin/cel-handoff','--author-binary',w/'bin/cel-expr'])
+ tier=run('tier-eligibility',[sys.executable,'-B',ROOT/'examples/tier-eligibility/run.py','--work',w/'tier','--cel-binary',w/'bin/cel-handoff','--author-binary',w/'bin/cel-expr','--host',w/'bin/lifecycle-core'])
  tier_path=w/'tier/results.json';tier_results=json.loads(tier_path.read_text()) if tier_path.exists() else {'status':'failed','errors':['run.py wrote no results.json'],'stderr':tier.stderr}
  check('tier-eligibility','Does the third consumer pass its hand-written cases, correction, replay and restatement?',tier.returncode==0 and tier_results['status']=='passed',{'status':tier_results['status'],'errors':tier_results.get('errors')})
  failures=run('quickstart-failures',[sys.executable,'-B',ROOT/'examples/quickstart/test_demo.py'])

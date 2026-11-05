@@ -2,6 +2,17 @@
 
 This file lists the changes for each snapshot tag. A tag is a stable snapshot to cite and copy. It is not a package release, and it does not promise a stable API or record format.
 
+## Unreleased
+
+### Reference code
+
+- The Go lifecycle core in `src/lifecycle-core` is now the only lifecycle Host (#95). The Python Host, its stores, its JSONL CLI and the protocol reference adapter are removed.
+- `src/cel-lifecycle` keeps the specs, the storage port vectors and the scenario fixture.
+- `scenario_test.go` runs the lifecycle scenario in the Go tests. Its expected values come from the fixture.
+- `src/lifecycle-core/client/` holds the Python callers of the Go JSONL host: the scenario driver and the generic caller. The examples use them.
+- `src/protocol/test_protocol.py` runs the session vectors only through the Go sidecar socket.
+- `verify.py` has no parity stage. The `go-lifecycle-core` check runs the Go scenario, the storage port vectors and the Host tests.
+
 ## v0.1.0 (2026-11-04)
 
 The first snapshot. It contains the runnable reference and its docs.

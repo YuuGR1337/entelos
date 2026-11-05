@@ -68,11 +68,10 @@ Step 4 makes sure that a passed flag never moves to other bytes or to another ru
 - If the installed runner identity changes, `decide` and `activate` refuse the old report with `implementation_unavailable`.
 - If a passed report is copied onto a new snapshot with other bytes, `decide` refuses it with `qualification_failed`.
 
-The `go-lifecycle-core` parity check shows that the CEL path gives the same trace as the Python core.
+The lifecycle scenario in `scenario_test.go` uses the CEL path. Its answers, replay and restatement agree with the fixed values of the scenario fixture.
 
 ## Limits
 
 - The fixture runner is a test runner. This contract adds no new production runner.
 - The candidate is still a CEL bundle. `propose`, `load` and `invoke` use the CEL runtime.
 - The candidate identity fields must be strings. A snapshot that holds another JSON type gives an empty identity.
-- The Python core has no runner interface. It stays a reference until issue #95 removes it.

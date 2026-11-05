@@ -9,19 +9,17 @@ import sys
 
 ROOT=Path(__file__).resolve().parent
 SOURCE=ROOT.parents[1]
-LIFE=SOURCE/'src/cel-lifecycle'
+LIFE=SOURCE/'src/lifecycle-core/client'
 PREPARE=SOURCE/'src/cel-handoff/tools/prepare.py'
 sys.path.insert(0,str(LIFE))
-from git_store import encode,decode,content_ref,envelope
-from cel_runtime import MIMES
-from scenario import Driver
+from lifecycle_client import Driver,encode,decode,content_ref,envelope,MIMES
 
 def fixture(name):return decode((ROOT/'fixtures'/name).read_bytes())
 
 class TierDriver(Driver):
-    """Reuse the generic Driver calls; replace only the parts that scenario.py writes for record.visible."""
-    def __init__(self,work,binary,spec,prepared):
-        super().__init__(LIFE,work,binary,spec);self.prepared=prepared
+    """Reuse the generic Driver calls to the Go JSONL host; add the parts for this function."""
+    def __init__(self,work,binary,spec,prepared,host):
+        super().__init__(work,binary,spec,host);self.prepared=prepared
     def bundle(self,fixed):
         # The author files come from prepare.py. Only the fixed values change for each stage.
         data={key:(self.prepared/filename).read_bytes() for key,filename in {'manifest':'manifest.json','environment':'env.json','source':'rule.cel'}.items()}
@@ -117,6 +115,7 @@ def lifecycle(d):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--work',type=Path,required=True);p.add_argument('--cel-binary',type=Path,required=True);p.add_argument('--author-binary',type=Path,required=True)
+    p.add_argument('--host',type=Path,required=True,help='Go lifecycle-core executable')
     a=p.parse_args();w=a.work.resolve();binary=a.cel_binary.resolve()
     if w==SOURCE or SOURCE in w.parents:p.error('work must be outside the source tree')
     if w.exists():p.error('work directory exists; preserve previous runs')
@@ -149,12 +148,12 @@ if __name__=='__main__':
         stale=json.loads(command('stale-bundle-ref',[binary,'-bundle',bundle,'run'],encode({'bundle_ref':'sha256:00','inputs':{'tier':'gold','trial':False}}).decode()).stdout)
         check('host-stale-reference','Does the host refuse a call that names another bundle?',stale.get('status')=='artifact_mismatch' and 'value' not in stale,stale)
         # 4. Lifecycle: approval, dated activation, answer, correction, replay and restatement through the unchanged JSONL CLI.
-        driver=TierDriver(w/'life',binary,life,bundle);pins=lifecycle(driver)
+        driver=TierDriver(w/'life',binary,life,bundle,a.host.resolve());pins=lifecycle(driver)
         # 5. Caller: the unchanged generic client calls the new function after the correction.
-        client=command('client',[sys.executable,'-B',LIFE/'client.py','--repo',driver.repo,'--context',driver.contexts['caller'],'--runtime',binary,'--work',driver.work,
+        client=command('client',[sys.executable,'-B',LIFE/'caller.py','--host',a.host,'--repo',driver.repo,'--context',driver.contexts['caller'],'--runtime',binary,'--work',driver.work,
                                  '--key','tier-client','--function',life['function'],'--date',life['original_date'],'--inputs',json.dumps(life['original_input'])])
         called=json.loads(client.stdout or '{}')
-        check('unchanged-client','Does the unchanged client.py call the new function and get the corrected answer?',
+        check('unchanged-client','Does the unchanged caller.py call the new function and get the corrected answer?',
               client.returncode==0 and called['data']['result']['actual']['value'] is life['expected']['november_silver_trial_after_correction'],called)
         fsck=command('fsck',['git','--git-dir='+str(driver.repo),'fsck','--full','--no-dangling'])
         check('fsck','Is the lifecycle Git history intact?',fsck.returncode==0,{'exit_code':fsck.returncode,'stderr':fsck.stderr})

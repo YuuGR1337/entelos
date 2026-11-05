@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the pinned host, run the record-filter loop and print the answer, correction, replay and restatement."""
+"""Build the pinned hosts, run the record-filter loop and print the answer, correction, replay and restatement."""
 import argparse
 import json
 import os
@@ -11,8 +11,8 @@ import subprocess
 import sys
 
 ROOT=Path(__file__).resolve().parents[2]
-LIFE=ROOT/'src/cel-lifecycle'
-FIXTURE=LIFE/'fixtures/lifecycle-scenario.json'
+CLIENT=ROOT/'src/lifecycle-core/client'
+FIXTURE=ROOT/'src/cel-lifecycle/fixtures/lifecycle-scenario.json'
 GO_MIN=(1,27,2)
 
 class MissingStep(Exception):pass
@@ -23,11 +23,11 @@ def find(trace,name):
    except (KeyError,TypeError):raise MissingStep('step %s has no response.data.result'%name)
  raise MissingStep('step %s is not in the trace'%name)
 def receipt_command(w,ref):
- """Return a shell command that prints the receipt ref from the demo Git store. It uses the lifecycle CLI read operation `receipt`."""
+ """Return a shell command that prints the receipt ref from the demo Git store. It uses the read operation `receipt` of the Go lifecycle host."""
  q=lambda x:shlex.quote(str(x));loop=w/'loop'
  request=json.dumps({'op':'receipt','receipt_ref':ref},separators=(',',':'))
- return "printf '%%s\\n' %s | python3 -B %s --repo %s --context %s --runtime %s --work %s | python3 -m json.tool"%(
-  q(request),q(LIFE/'cli.py'),q(loop/'state.git'),q(loop/'reader.json'),q(w/'bin/cel-handoff'),q(loop))
+ return "printf '%%s\\n' %s | %s --repo %s --context %s --runtime %s --work %s | python3 -m json.tool"%(
+  q(request),q(w/'bin/lifecycle-core'),q(loop/'state.git'),q(loop/'reader.json'),q(w/'bin/cel-handoff'),q(loop))
 def write_summary(w,summary):(w/'summary.json').write_text(json.dumps(summary,indent=2,ensure_ascii=False)+'\n')
 def step_failed(w,step,code,stdout,stderr):
  # Keep the failed step's output in summary.json and on stderr, then stop.
@@ -144,21 +144,22 @@ def main():
   'GOCACHE':str(w/'cache/build'),'GOMODCACHE':str(w/'cache/mod'),'GOPATH':str(w/'cache/gopath'),
   'GOTMPDIR':str(w/'tmp'),'TMPDIR':str(w/'tmp'),'TEST_TELEMETRY_DIR':str(w/'cache/telemetry'),
   'GOENV':'off','GOWORK':'off','GOFLAGS':'','GOTOOLCHAIN':'local','PYTHONDONTWRITEBYTECODE':'1',
-  'CEL_LIFECYCLE_SOURCE':str(LIFE)}
+  'LIFECYCLE_CLIENT_SOURCE':str(CLIENT)}
  def run(step,args,cwd=ROOT):
   result=subprocess.run([str(x) for x in args],cwd=cwd,env=env,capture_output=True,text=True)
   if result.returncode:step_failed(w,step,result.returncode,result.stdout,result.stderr)
   return result
  # Each run has a new module cache, so each run downloads the pinned Go modules.
- print('Building the pinned host (this downloads the pinned Go modules)...',flush=True)
+ print('Building the pinned hosts (this downloads the pinned Go modules)...',flush=True)
  binary=w/'bin/cel-handoff'
  run('build-host',['go','build','-mod=readonly','-trimpath','-buildvcs=false','-o',binary,'./cmd/cel-handoff'],ROOT/'src/cel-handoff')
  identity=run('host-identity',[binary,'-build'])
  try:build=json.loads(identity.stdout)
  except ValueError as error:step_failed(w,'host-identity',identity.returncode or 1,identity.stdout,identity.stderr+'the output is not valid JSON: %s\n'%error)
+ run('build-lifecycle',['go','build','-mod=readonly','-trimpath','-buildvcs=false','-o',w/'bin/lifecycle-core','./cmd/lifecycle-core'],ROOT/'src/lifecycle-core')
  run('prepare-record',[sys.executable,'-B',ROOT/'src/cel-handoff/tools/prepare.py','--bundle',w/'record-bundle','--binary',binary])
  print('Running the record-filter loop...',flush=True)
- loop=subprocess.run([str(x) for x in [sys.executable,'-B',LIFE/'scenario.py','--work',w/'loop','--runtime',binary,'--bundle',w/'record-bundle','--fixture',FIXTURE]],
+ loop=subprocess.run([str(x) for x in [sys.executable,'-B',CLIENT/'scenario.py','--work',w/'loop','--runtime',binary,'--bundle',w/'record-bundle','--fixture',FIXTURE,'--host',w/'bin/lifecycle-core']],
                      cwd=ROOT,env=env,capture_output=True,text=True)
  summary=summarize(w,json.loads(FIXTURE.read_text()),build,loop)
  write_summary(w,summary);report(summary)
