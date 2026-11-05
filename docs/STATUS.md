@@ -24,7 +24,7 @@ On 2026-10-29, the code moved to `src/` and `examples/`, the boundary test moved
 
 ## Next work
 
-Use [BACKLOG.md](BACKLOG.md) and the linked GitHub issues. The next milestone is [M5 Snapshot and announcement](https://github.com/mohanraj00/entelos/issues/14).
+Use [BACKLOG.md](BACKLOG.md) and the linked GitHub issues. The next milestone is [M6 Store-neutral core and versioned protocol](https://github.com/mohanraj00/entelos/issues/77). [M5](https://github.com/mohanraj00/entelos/issues/14) stays open only for the quiet share and the public post. Both need specific maintainer authorization.
 
 ### M1 First contact
 
@@ -93,6 +93,10 @@ These are the limits of the M4 result:
 
 - The outside pull requests changed only docs. No outside contributor changed code.
 - Starter issues #62, #65 and #66 are open. PR #71 for issue #65 is open.
+
+### M6 Store-neutral core and versioned protocol
+
+On 2026-11-05, the maintainer approved the M6 scope in issue #77. The technology decision (#85) comes first, and the maintainer makes it. The protocol (#83) and the sidecar (#84) wait for that decision. The specs and vectors for #78 to #81 are language-neutral.
 
 Keep caller walkthrough and input-correction documentation bounded to the existing examples. Numeric/structured profiles, production DBs, authentication gateways and resident-worker coordination are outside the current implemented scope.
 
