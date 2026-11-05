@@ -8,7 +8,8 @@ This map points to executable reference contracts. It is not a separately versio
 | Authoring | [prepare.py](../src/cel-handoff/tools/prepare.py) and pinned upstream CEL CLI | One environment describes the author/host declarations; tests remain host-owned. |
 | Calling | [client.py](../src/cel-lifecycle/client.py) | Discover a typed contract, then send named values and expected bundle identity without source or tests. |
 | Lifecycle | [lifecycle.py](../src/cel-lifecycle/lifecycle.py) | Qualification/report binding, separate admission, interval selection, preparation, receipt and correction operations. |
-| Wire protocol 1.0 | [PROTOCOL.md](../src/protocol/PROTOCOL.md) | Versioned, length-prefixed JSON frames; one schema for each operation; golden vectors that the reference adapter passes. Unstable. |
+| Wire protocol 1.0 | [PROTOCOL.md](../src/protocol/PROTOCOL.md) | Versioned, length-prefixed JSON frames; one schema for each operation; golden vectors that the reference adapter and the Go sidecar pass. Unstable. |
+| Local sidecar | [entelos-sidecar](../src/lifecycle-core/README.md#sidecar) | Wire protocol 1.0 on a Unix domain socket with mode 0600 in front of the Go Host; stale-socket replacement and socket removal on shutdown; no authentication. |
 | Local storage | [git_store.py](../src/cel-lifecycle/git_store.py) | Immutable objects, captured historical roots, request-key recovery and single-root compare-and-swap. |
 | Application boundary | [adapter.py](../examples/ci-trigger/adapter.py) | Project a nested event, retain raw/projection audit links; no atomic webhook ingress or pipeline effect is implemented. |
 

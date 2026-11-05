@@ -104,6 +104,8 @@ Issue #79 adds a storage port spec, 11 JSON storage vectors and an in-memory ada
 
 Issue #80 adds the [qualification runner contract](../src/lifecycle-core/RUNNER.md) to the Go core. CEL is the first runner, and a test-only fixture runner shows that runners plug in.
 
+Issue #84 adds the Go sidecar `entelos-sidecar`: wire protocol 1.0 on a Unix socket with mode 0600. It passes all session vectors through the socket (`sidecar-protocol`), and [examples/sidecar-client](../examples/sidecar-client/README.md) completes propose, qualify, decide, activate and invoke through the socket only (`sidecar-client`). There is no authentication beyond the file mode.
+
 Keep caller walkthrough and input-correction documentation bounded to the existing examples. Numeric/structured profiles, production DBs, authentication gateways and resident-worker coordination are outside the current implemented scope.
 
 ## Handoff rule

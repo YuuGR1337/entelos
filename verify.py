@@ -105,6 +105,22 @@ try:
  protocol_path=w/'protocol/test-results.json'
  protocol_results=json.loads(protocol_path.read_text()) if protocol_path.exists() else {'successful':False,'error':'test_protocol.py wrote no test-results.json','exit_code':protocol.returncode,'stderr':protocol.stderr}
  check('protocol','Does the reference adapter pass the versioned wire protocol vectors?',protocol.returncode==0 and protocol_results['successful'],protocol_results)
+ # The Go sidecar runs the same session vector files through its Unix socket. Its JCS, schema and stub Host tests are in go-core-tests.
+ sidecar=[run('build-sidecar',['go','build','-mod=readonly','-trimpath','-buildvcs=false','-o',w/'bin/entelos-sidecar','./cmd/entelos-sidecar'],core)]
+ if sidecar[0].returncode==0:
+  sidecar.append(run('sidecar-vectors',[sys.executable,'-B',ROOT/'src/protocol/test_protocol.py','--sidecar',w/'bin/entelos-sidecar','--runtime',w/'bin/cel-handoff','--work',w/'sidecar-protocol']))
+ sidecar_path=w/'sidecar-protocol/test-results.json'
+ sidecar_results=json.loads(sidecar_path.read_text()) if sidecar_path.exists() else {'successful':False,'error':'no sidecar test-results.json','stages':{c['name']:c['exit_code'] for c in commands[-len(sidecar):]},'stderr':sidecar[-1].stderr}
+ session_files={p.name:len(json.loads(p.read_text())['steps']) for p in sorted((ROOT/'src/protocol/vectors').glob('session-*.json'))}
+ check('sidecar-protocol','Does the Go sidecar pass every session vector of the wire protocol through its Unix socket?',
+       len(sidecar)==2 and all(x.returncode==0 for x in sidecar) and sidecar_results['successful']
+       and {f['file']:f['steps'] for f in sidecar_results.get('files',[]) if f['errors']==0}==session_files,
+       {'expected_files':session_files,'results':sidecar_results})
+ client=run('sidecar-client',[sys.executable,'-B',ROOT/'examples/sidecar-client/run.py','--work',w/'sidecar-client','--sidecar',w/'bin/entelos-sidecar','--cel-binary',w/'bin/cel-handoff','--record-bundle',w/'record-bundle'])
+ client_path=w/'sidecar-client/results.json'
+ client_results=json.loads(client_path.read_text()) if client_path.exists() else {'status':'failed','error':'run.py wrote no results.json','stderr':client.stderr}
+ check('sidecar-client','Does a client that talks only to the sidecar socket complete propose, qualify, decide, activate and invoke?',
+       client.returncode==0 and client_results['status']=='passed',{k:client_results.get(k) for k in ['status','error','checks']})
  demo=run('consumer-reuse',[sys.executable,'-B',ROOT/'examples/ci-trigger/run.py','--work',w/'reuse','--cel-binary',w/'bin/cel-handoff','--author-binary',w/'bin/cel-expr','--record-bundle',w/'record-bundle'])
  reuse=json.loads((w/'reuse/results.json').read_text())
  check('two-consumers-and-baseline','Do both consumer loops and the ordinary-code comparison pass?',demo.returncode==0 and reuse['status']=='passed',{'status':reuse['status'],'checks':reuse['checks'],'measurements':reuse['measurements'],'errors':reuse['errors']})

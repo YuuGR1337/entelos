@@ -14,7 +14,8 @@ The protocol is unstable. A later milestone states its compatibility.
 | `vectors/jcs.json` | RFC 8785 canonical form vectors. |
 | `vectors/envelope-schema.json` | Valid and invalid values for the envelope definitions. |
 | `reference_adapter.py` | The reference adapter in front of the local Host. |
-| `test_protocol.py` | The vector runner. `verify.py` runs it as the `protocol` check. |
+| `test_protocol.py` | The vector runner. `verify.py` runs it as the `protocol` check. With `--sidecar`, it runs the session vectors through the socket of the Go sidecar (the `sidecar-protocol` check). |
+| `../lifecycle-core/protocol/` | The Go adapter. `../lifecycle-core/cmd/entelos-sidecar` serves it on a Unix domain socket. |
 
 ## Frame
 
@@ -120,11 +121,18 @@ The runner also checks that each response frame is in the frame bound. It checks
 
 If a session file has an error, the runner keeps its store directory under the work directory and lists it in `kept_stores`. An error record keeps the full exception text and the traceback.
 
-The Go sidecar (#84) must pass the same vector files.
+## Go sidecar
+
+The Go sidecar (#84) passes the same vector files:
+
+- With `--sidecar`, `test_protocol.py` starts a new sidecar process for each session file, with the `context` of the file and a new store. Each frame step uses a new connection. After the response, the runner sends a probe frame with the version `9.0`. If the connection is open, the probe gets `unsupported_version`. If the connection is closed, the stream ends. Thus the runner sees `close`. A stream step sends the bytes in parts of `read_size` bytes and reads the output in parts of `write_size` bytes.
+- The runner also checks that the socket file has mode 0600, that each payload is canonical, and that the sidecar removes its socket file and exits with status 0 after SIGTERM.
+- A self-test gives the runner a wrong response, a close that the step does not expect and a close that does not occur. The runner must report all three.
+- The Go tests in `src/lifecycle-core/protocol/` run all vector files in the process, with short reads and short writes, and the stub Host checks.
 
 ## Limits
 
-- The vectors do not run a rule. `describe` with an activation, `qualify`, `load`, `invoke`, `replay` and `restate` are checked only by their schemas. The sidecar work (#84) adds vectors with a fixture runtime.
+- The vectors do not run a rule. `describe` with an activation, `qualify`, `load`, `invoke`, `replay` and `restate` are checked only by their schemas. The [sidecar client](../../examples/sidecar-client/README.md) runs `qualify`, `describe`, `load` and `invoke` through the socket with the pinned runtime, but it is an example, not a vector.
 - Record objects inside a result (`report`, `receipt`, `state`) have the type `object` only. The record format version (#78) owns their schemas.
 - The validator supports only the JSON Schema keywords that the files in `schema/` use.
-- The adapter does not open a socket. `Adapter.serve` reads frames from a stream, and the sidecar (#84) owns the socket.
+- The reference adapter does not open a socket. `Adapter.serve` reads frames from a stream. The Go sidecar owns the socket.

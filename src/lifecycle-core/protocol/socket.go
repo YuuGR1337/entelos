@@ -1,0 +1,168 @@
+package protocol
+
+// The local socket of the sidecar. POSIX only.
+
+import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"net"
+	"os"
+	"sync"
+	"syscall"
+	"time"
+)
+
+// MaxSocketPath is the longest socket path that Listen accepts, in bytes. The
+// sun_path field has 104 bytes on macOS and 108 bytes on Linux, with a final
+// NUL. A launcher with a longer path can start the sidecar in the socket
+// directory and give a relative path.
+const MaxSocketPath = 103
+
+// LockWait is the longest time that Listen waits for the start lock.
+const LockWait = 10 * time.Second
+
+// Listen makes a Unix domain socket at path with file mode 0600. If the path
+// exists, Listen removes it only if it is a stale socket: a socket file with
+// no listener. Listen refuses any other file and a socket with a listener.
+//
+// Listen holds an exclusive lock on the file path+".lock" only during the
+// stale check, the removal and the bind. Thus two sidecars that start at the
+// same time cannot both see one stale socket, and the second one cannot
+// remove the live socket of the first one. The lock file stays after Listen.
+// Listen refuses a lock file that is not a regular file of the current user.
+// If it cannot get the lock in LockWait, Listen fails.
+func Listen(path string) (*net.UnixListener, error) {
+	if len(path) > MaxSocketPath {
+		return nil, fmt.Errorf("socket path is longer than %d bytes: start the sidecar in the socket directory and give a relative path", MaxSocketPath)
+	}
+	lock, err := os.OpenFile(path+".lock", os.O_RDWR|os.O_CREATE|syscall.O_NOFOLLOW, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	defer lock.Close()
+	info, err := lock.Stat()
+	if err != nil {
+		return nil, err
+	}
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !info.Mode().IsRegular() || !ok || int(st.Uid) != os.Getuid() {
+		return nil, fmt.Errorf("%s.lock is not a regular file of the current user", path)
+	}
+	if err := lock.Chmod(0o600); err != nil {
+		return nil, err
+	}
+	deadline := time.Now().Add(LockWait)
+	for {
+		err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, err
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("%s.lock: another process holds the start lock", path)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return listenLocked(path)
+}
+
+func listenLocked(path string) (*net.UnixListener, error) {
+	info, err := os.Lstat(path)
+	switch {
+	case err == nil && info.Mode().Type() != fs.ModeSocket:
+		return nil, fmt.Errorf("%s exists and is not a socket", path)
+	case err == nil:
+		conn, dialErr := net.Dial("unix", path)
+		if dialErr == nil {
+			conn.Close()
+			return nil, fmt.Errorf("%s has a listener", path)
+		}
+		if !errors.Is(dialErr, syscall.ECONNREFUSED) {
+			return nil, fmt.Errorf("%s: cannot tell if the socket is stale: %w", path, dialErr)
+		}
+		if err := os.Remove(path); err != nil {
+			return nil, err
+		}
+	case !errors.Is(err, fs.ErrNotExist):
+		return nil, err
+	}
+	// The umask makes the socket file 0600 when bind makes it, so no other
+	// user can connect before the chmod.
+	old := syscall.Umask(0o177)
+	listener, err := net.ListenUnix("unix", &net.UnixAddr{Name: path, Net: "unix"})
+	syscall.Umask(old)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		listener.Close()
+		return nil, err
+	}
+	listener.SetUnlinkOnClose(true)
+	return listener, nil
+}
+
+// Server serves an Adapter on a listener. Each connection has its own
+// goroutine. The Adapter sends one Host request at a time.
+type Server struct {
+	Adapter *Adapter
+	mu      sync.Mutex
+	conns   map[net.Conn]bool
+	wg      sync.WaitGroup
+	closed  bool
+}
+
+// Serve accepts connections until the listener closes.
+func (s *Server) Serve(listener net.Listener) error {
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			s.mu.Lock()
+			closed := s.closed
+			s.mu.Unlock()
+			if closed || errors.Is(err, net.ErrClosed) {
+				return nil
+			}
+			return err
+		}
+		s.mu.Lock()
+		if s.closed {
+			s.mu.Unlock()
+			conn.Close()
+			continue
+		}
+		if s.conns == nil {
+			s.conns = map[net.Conn]bool{}
+		}
+		s.conns[conn] = true
+		s.wg.Add(1)
+		s.mu.Unlock()
+		go func() {
+			defer s.wg.Done()
+			s.Adapter.Serve(conn, conn)
+			conn.Close()
+			s.mu.Lock()
+			delete(s.conns, conn)
+			s.mu.Unlock()
+		}()
+	}
+}
+
+// Shutdown closes the listener, which removes the socket file, closes each
+// open connection and waits for the connection goroutines.
+func (s *Server) Shutdown(listener *net.UnixListener) error {
+	s.mu.Lock()
+	s.closed = true
+	for conn := range s.conns {
+		conn.Close()
+	}
+	s.mu.Unlock()
+	// Close removes the socket file before the wait. Shutdown does not remove
+	// the path again, because a new sidecar can bind it during the wait.
+	err := listener.Close()
+	s.wg.Wait()
+	return err
+}
