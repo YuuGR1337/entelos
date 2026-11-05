@@ -1,0 +1,82 @@
+{
+ "$defs": {
+  "request_body": {
+   "additionalProperties": false,
+   "properties": {
+    "expected_revision": {
+     "type": "string"
+    },
+    "message": {
+     "type": "string"
+    },
+    "receipt_ref": {
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "request_key": {
+     "maxLength": 128,
+     "minLength": 1,
+     "type": "string"
+    },
+    "route": {
+     "enum": [
+      "source",
+      "artifact",
+      "contract",
+      "test",
+      "runtime"
+     ],
+     "type": "string"
+    }
+   },
+   "required": [
+    "expected_revision",
+    "message",
+    "receipt_ref",
+    "request_key",
+    "route"
+   ],
+   "type": "object"
+  },
+  "result": {
+   "additionalProperties": false,
+   "properties": {
+    "cursor": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "result": {
+     "additionalProperties": false,
+     "properties": {
+      "observation_ref": {
+       "pattern": "^sha256:[0-9a-f]{64}$",
+       "type": "string"
+      },
+      "task_id": {
+       "minLength": 1,
+       "type": "string"
+      }
+     },
+     "required": [
+      "observation_ref",
+      "task_id"
+     ],
+     "type": "object"
+    },
+    "reused": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "cursor",
+    "result",
+    "reused"
+   ],
+   "type": "object"
+  }
+ },
+ "$id": "https://github.com/mohanraj00/entelos/blob/main/src/protocol/schema/observe.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "observe",
+ "x-entelos-access": "write"
+}

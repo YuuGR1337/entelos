@@ -1,0 +1,32 @@
+{
+ "$defs": {
+  "request_body": {
+   "additionalProperties": false,
+   "properties": {
+    "cursor": {
+     "type": "string"
+    },
+    "kind": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "ref": {
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind",
+    "ref"
+   ],
+   "type": "object"
+  },
+  "result": {
+   "type": "object"
+  }
+ },
+ "$id": "https://github.com/mohanraj00/entelos/blob/main/src/protocol/schema/record.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "record",
+ "x-entelos-access": "read"
+}

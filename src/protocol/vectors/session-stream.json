@@ -1,0 +1,64 @@
+{
+ "description": "A write in a stream on a fresh store. The runner checks each success result against the result schema of the operation.",
+ "context": {
+  "actor": "reviewer-a",
+  "roles": [
+   "reviewer",
+   "author",
+   "runner",
+   "worker",
+   "caller",
+   "reader",
+   "observer"
+  ],
+  "scope": "tenant-example",
+  "runner_actor": "fixture-runner",
+  "worker": "local-worker",
+  "functions": [
+   "record.visible"
+  ]
+ },
+ "steps": [
+  {
+   "name": "stream-source-write",
+   "stream_hex": "000000fc7b22626f6479223a7b2265787065637465645f7265766973696f6e223a22222c2266726f6d223a22323032362d31312d3031222c2266756e6374696f6e223a227265636f72642e76697369626c65222c22726561736f6e223a22696e697469616c2072756c65222c22726571756573745f6b6579223a226b2d73747265616d222c2274657874223a224172636869766564207265636f72647320617265206e6f742076697369626c652e222c22756e74696c223a22323032362d31322d3031227d2c226f7065726174696f6e223a22736f75726365222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a2273742d31227d000000fc7b22626f6479223a7b2265787065637465645f7265766973696f6e223a22222c2266726f6d223a22323032362d31312d3031222c2266756e6374696f6e223a227265636f72642e76697369626c65222c22726561736f6e223a22696e697469616c2072756c65222c22726571756573745f6b6579223a226b2d73747265616d222c2274657874223a224172636869766564207265636f72647320617265206e6f742076697369626c652e222c22756e74696c223a22323032362d31322d3031227d2c226f7065726174696f6e223a22736f75726365222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a2273742d31227d",
+   "operation": "source",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "st-1",
+      "status": "ok",
+      "result": {
+       "cursor": {
+        "$capture": "c1"
+       },
+       "result": {
+        "source_ref": {
+         "$capture": "s1"
+        }
+       },
+       "reused": false
+      }
+     },
+     {
+      "protocol": "1.0",
+      "request_id": "st-1",
+      "status": "ok",
+      "result": {
+       "cursor": {
+        "$capture": "c1"
+       },
+       "result": {
+        "source_ref": {
+         "$capture": "s1"
+        }
+       },
+       "reused": true
+      }
+     }
+    ]
+   }
+  }
+ ]
+}

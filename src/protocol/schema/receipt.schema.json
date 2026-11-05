@@ -1,0 +1,24 @@
+{
+ "$defs": {
+  "request_body": {
+   "additionalProperties": false,
+   "properties": {
+    "receipt_ref": {
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    }
+   },
+   "required": [
+    "receipt_ref"
+   ],
+   "type": "object"
+  },
+  "result": {
+   "type": "object"
+  }
+ },
+ "$id": "https://github.com/mohanraj00/entelos/blob/main/src/protocol/schema/receipt.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "receipt",
+ "x-entelos-access": "read"
+}

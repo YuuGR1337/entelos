@@ -1,0 +1,435 @@
+{
+ "description": "Host results through the protocol on one fresh store, in order.",
+ "context": {
+  "actor": "reviewer-a",
+  "roles": [
+   "reviewer",
+   "author",
+   "runner",
+   "worker",
+   "caller",
+   "reader",
+   "observer"
+  ],
+  "scope": "tenant-example",
+  "runner_actor": "fixture-runner",
+  "worker": "local-worker",
+  "functions": [
+   "record.visible"
+  ]
+ },
+ "steps": [
+  {
+   "name": "inspect-empty",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-1",
+    "operation": "inspect",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-1",
+     "status": "ok",
+     "result": {
+      "cursor": "",
+      "state": {
+       "schema": "local-lifecycle/v1",
+       "heads": {},
+       "sources": [],
+       "plans": [],
+       "events": [],
+       "requests": {},
+       "workers": {},
+       "receipts": [],
+       "tasks": {},
+       "outbox": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "source",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-2",
+    "operation": "source",
+    "body": {
+     "function": "record.visible",
+     "from": "2026-11-01",
+     "until": "2026-12-01",
+     "text": "Archived records are not visible.",
+     "reason": "initial rule",
+     "expected_revision": "",
+     "request_key": "k-1"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-2",
+     "status": "ok",
+     "result": {
+      "cursor": {
+       "$capture": "c1"
+      },
+      "result": {
+       "source_ref": {
+        "$capture": "s1"
+       }
+      },
+      "reused": false
+     }
+    }
+   }
+  },
+  {
+   "name": "source-retry",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-3",
+    "operation": "source",
+    "body": {
+     "function": "record.visible",
+     "from": "2026-11-01",
+     "until": "2026-12-01",
+     "text": "Archived records are not visible.",
+     "reason": "initial rule",
+     "expected_revision": "",
+     "request_key": "k-1"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-3",
+     "status": "ok",
+     "result": {
+      "cursor": {
+       "$capture": "c1"
+      },
+      "result": {
+       "source_ref": {
+        "$capture": "s1"
+       }
+      },
+      "reused": true
+     }
+    }
+   }
+  },
+  {
+   "name": "same-key-other-payload",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-4",
+    "operation": "source",
+    "body": {
+     "function": "record.visible",
+     "from": "2026-11-01",
+     "until": "2026-12-01",
+     "text": "Other text.",
+     "reason": "initial rule",
+     "expected_revision": "",
+     "request_key": "k-1"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-4",
+     "status": "idempotency_conflict",
+     "diagnostic": {
+      "code": "idempotency_conflict",
+      "stage": "lifecycle",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "stale-revision",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-5",
+    "operation": "source",
+    "body": {
+     "function": "record.visible",
+     "from": "2026-11-01",
+     "until": "2026-12-01",
+     "text": "Archived records are not visible.",
+     "reason": "initial rule",
+     "expected_revision": "",
+     "request_key": "k-2"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-5",
+     "status": "stale_revision",
+     "diagnostic": {
+      "code": "stale_revision",
+      "stage": "lifecycle",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "read-source",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-6",
+    "operation": "record",
+    "body": {
+     "ref": {
+      "$use": "s1"
+     },
+     "kind": "source"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-6",
+     "status": "ok",
+     "result": {
+      "attester": "reviewer-a",
+      "from": "2026-11-01",
+      "function": "record.visible",
+      "reason": "initial rule",
+      "scope": "tenant-example",
+      "supersedes": [],
+      "text": "Archived records are not visible.",
+      "until": "2026-12-01"
+     }
+    }
+   }
+  },
+  {
+   "name": "plan",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-7",
+    "operation": "plan",
+    "body": {
+     "source_ref": {
+      "$use": "s1"
+     },
+     "cases": [
+      {
+       "name": "archived",
+       "inputs": {
+        "state": "reviewed",
+        "archived": true
+       },
+       "value": false
+      }
+     ],
+     "origin": "hand-written expectations",
+     "expected_revision": {
+      "$use": "c1"
+     },
+     "request_key": "k-3"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-7",
+     "status": "ok",
+     "result": {
+      "cursor": {
+       "$capture": "c2"
+      },
+      "result": {
+       "plan_ref": {
+        "$capture": "p1"
+       }
+      },
+      "reused": false
+     }
+    }
+   }
+  },
+  {
+   "name": "describe-without-activation",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-8",
+    "operation": "describe",
+    "body": {
+     "function": "record.visible",
+     "date": "2026-11-15"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-8",
+     "status": "out_of_scope",
+     "diagnostic": {
+      "code": "out_of_scope",
+      "stage": "resolve",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "role-not-installed",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-9",
+    "operation": "claim",
+    "body": {
+     "task_id": "t-1",
+     "checkpoint": "0",
+     "expected_revision": "",
+     "request_key": "k-1"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-9",
+     "status": "forbidden",
+     "diagnostic": {
+      "code": "forbidden",
+      "stage": "authority",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "function-not-installed",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-10",
+    "operation": "source",
+    "body": {
+     "function": "other.function",
+     "from": "2026-11-01",
+     "until": "2026-12-01",
+     "text": "Archived records are not visible.",
+     "reason": "initial rule",
+     "expected_revision": {
+      "$use": "c2"
+     },
+     "request_key": "k-4"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-10",
+     "status": "out_of_scope",
+     "diagnostic": {
+      "code": "out_of_scope",
+      "stage": "lifecycle",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "reversed-interval",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-11",
+    "operation": "source",
+    "body": {
+     "function": "record.visible",
+     "from": "2026-12-01",
+     "until": "2026-11-01",
+     "text": "Archived records are not visible.",
+     "reason": "initial rule",
+     "expected_revision": {
+      "$use": "c2"
+     },
+     "request_key": "k-5"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-11",
+     "status": "invalid_interval",
+     "diagnostic": {
+      "code": "invalid_interval",
+      "stage": "lifecycle",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "impossible-date",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-12",
+    "operation": "describe",
+    "body": {
+     "function": "record.visible",
+     "date": "2026-02-30"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-12",
+     "status": "invalid_interval",
+     "diagnostic": {
+      "code": "invalid_interval",
+      "stage": "lifecycle",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "unknown-record",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "l-13",
+    "operation": "record",
+    "body": {
+     "ref": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+     "kind": "source"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "l-13",
+     "status": "artifact_unavailable",
+     "diagnostic": {
+      "code": "artifact_unavailable",
+      "stage": "store",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  }
+ ]
+}

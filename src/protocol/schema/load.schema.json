@@ -1,0 +1,91 @@
+{
+ "$defs": {
+  "request_body": {
+   "additionalProperties": false,
+   "properties": {
+    "date": {
+     "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+     "type": "string"
+    },
+    "expected_revision": {
+     "type": "string"
+    },
+    "function": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "request_key": {
+     "maxLength": 128,
+     "minLength": 1,
+     "type": "string"
+    }
+   },
+   "required": [
+    "date",
+    "expected_revision",
+    "function",
+    "request_key"
+   ],
+   "type": "object"
+  },
+  "result": {
+   "additionalProperties": false,
+   "properties": {
+    "cursor": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "result": {
+     "additionalProperties": false,
+     "properties": {
+      "bundle_ref": {
+       "pattern": "^sha256:[0-9a-f]{64}$",
+       "type": "string"
+      },
+      "engine_build": {
+       "pattern": "^sha256:[0-9a-f]{64}$",
+       "type": "string"
+      },
+      "event_ref": {
+       "pattern": "^sha256:[0-9a-f]{64}$",
+       "type": "string"
+      },
+      "observed_cursor": {
+       "type": "string"
+      },
+      "snapshot_ref": {
+       "pattern": "^sha256:[0-9a-f]{64}$",
+       "type": "string"
+      },
+      "worker": {
+       "minLength": 1,
+       "type": "string"
+      }
+     },
+     "required": [
+      "event_ref",
+      "snapshot_ref",
+      "bundle_ref",
+      "engine_build",
+      "observed_cursor",
+      "worker"
+     ],
+     "type": "object"
+    },
+    "reused": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "cursor",
+    "result",
+    "reused"
+   ],
+   "type": "object"
+  }
+ },
+ "$id": "https://github.com/mohanraj00/entelos/blob/main/src/protocol/schema/load.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "load",
+ "x-entelos-access": "write"
+}

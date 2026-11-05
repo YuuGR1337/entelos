@@ -27,7 +27,7 @@ env={k:v for k,v in os.environ.items() if not k.startswith('GIT_')}|{
  'CEL_LIFECYCLE_SOURCE':str(ROOT/'src/cel-lifecycle'),
  'LIFECYCLE_TEST_WORK':str(w/'conformance'),'LIFECYCLE_CEL_BINARY':str(w/'bin/cel-handoff'),
  'LIFECYCLE_CEL_BUNDLE':str(w/'record-bundle'),'LIFECYCLE_FIXTURE':str(ROOT/'src/cel-lifecycle/fixtures/lifecycle-scenario.json'),
- 'EXPORT_TEST_WORK':str(w/'boundaries'),'QUICKSTART_TEST_WORK':str(w/'quickstart-failures'),'DECISION_EXPORT_SOURCE':str(ROOT)}
+ 'EXPORT_TEST_WORK':str(w/'boundaries'),'PROTOCOL_TEST_WORK':str(w/'protocol'),'QUICKSTART_TEST_WORK':str(w/'quickstart-failures'),'DECISION_EXPORT_SOURCE':str(ROOT)}
 for key in list(os.environ):
  if key.startswith('GIT_'):os.environ.pop(key)
 os.environ.update(env)
@@ -99,6 +99,10 @@ try:
        len(go_core)==4 and all(x.returncode==0 for x in go_core),
        {'stages':{c['name']:c['exit_code'] for c in commands[-len(go_core):]},
         'parity':{k:parity.get(k) for k in ['status','steps','first_difference','same_snapshot_refs']}})
+ protocol=run('protocol-vectors',[sys.executable,'-B',ROOT/'src/protocol/test_protocol.py'])
+ protocol_path=w/'protocol/test-results.json'
+ protocol_results=json.loads(protocol_path.read_text()) if protocol_path.exists() else {'successful':False,'error':'test_protocol.py wrote no test-results.json','exit_code':protocol.returncode,'stderr':protocol.stderr}
+ check('protocol','Does the reference adapter pass the versioned wire protocol vectors?',protocol.returncode==0 and protocol_results['successful'],protocol_results)
  demo=run('consumer-reuse',[sys.executable,'-B',ROOT/'examples/ci-trigger/run.py','--work',w/'reuse','--cel-binary',w/'bin/cel-handoff','--author-binary',w/'bin/cel-expr','--record-bundle',w/'record-bundle'])
  reuse=json.loads((w/'reuse/results.json').read_text())
  check('two-consumers-and-baseline','Do both consumer loops and the ordinary-code comparison pass?',demo.returncode==0 and reuse['status']=='passed',{'status':reuse['status'],'checks':reuse['checks'],'measurements':reuse['measurements'],'errors':reuse['errors']})

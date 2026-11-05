@@ -1,0 +1,842 @@
+{
+ "description": "Frame and envelope rules. No step changes the store.",
+ "context": {
+  "actor": "reviewer-a",
+  "roles": [
+   "reviewer",
+   "author",
+   "runner",
+   "worker",
+   "caller",
+   "reader",
+   "observer"
+  ],
+  "scope": "tenant-example",
+  "runner_actor": "fixture-runner",
+  "worker": "local-worker",
+  "functions": [
+   "record.visible"
+  ]
+ },
+ "steps": [
+  {
+   "name": "current-version",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "r-ok",
+    "operation": "inspect",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-ok",
+     "status": "ok",
+     "result": {
+      "cursor": "",
+      "state": {
+       "schema": "local-lifecycle/v1",
+       "heads": {},
+       "sources": [],
+       "plans": [],
+       "events": [],
+       "requests": {},
+       "workers": {},
+       "receipts": [],
+       "tasks": {},
+       "outbox": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "unknown-major",
+   "request": {
+    "protocol": "2.0",
+    "request_id": "r-2",
+    "operation": "inspect",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-2",
+     "status": "unsupported_version",
+     "diagnostic": {
+      "code": "unsupported_version",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "older-major",
+   "request": {
+    "protocol": "0.9",
+    "request_id": "r-0",
+    "operation": "inspect",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-0",
+     "status": "unsupported_version",
+     "diagnostic": {
+      "code": "unsupported_version",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "higher-minor",
+   "request": {
+    "protocol": "1.1",
+    "request_id": "r-11",
+    "operation": "inspect",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-11",
+     "status": "unsupported_version",
+     "diagnostic": {
+      "code": "unsupported_version",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "malformed-version",
+   "request": {
+    "protocol": "1",
+    "request_id": "r-m",
+    "operation": "inspect",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-m",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "version-not-string",
+   "request": {
+    "protocol": 1,
+    "request_id": "r-n",
+    "operation": "inspect",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-n",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "version-trailing-newline",
+   "request": {
+    "protocol": "1.0\n",
+    "request_id": "r-nl",
+    "operation": "inspect",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-nl",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "missing-version",
+   "request": {
+    "request_id": "r-x",
+    "operation": "inspect",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-x",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "unknown-operation",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "r-u",
+    "operation": "delete",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-u",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "missing-request-id",
+   "request": {
+    "protocol": "1.0",
+    "operation": "inspect",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "request-id-too-long",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "operation": "inspect",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "unexpected-envelope-field",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "r-e",
+    "operation": "inspect",
+    "body": {},
+    "trace": "on"
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-e",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "body-not-object",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "r-b",
+    "operation": "inspect",
+    "body": []
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-b",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "duplicate-key",
+   "payload_text": "{\"protocol\":\"1.0\",\"protocol\":\"1.0\",\"request_id\":\"r-d\",\"operation\":\"inspect\",\"body\":{}}",
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "float-number",
+   "payload_text": "{\"protocol\":\"1.0\",\"request_id\":\"r-f\",\"operation\":\"inspect\",\"body\":{\"cursor\":1.5}}",
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "not-an-object",
+   "payload_text": "[\"inspect\"]",
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "invalid-utf8",
+   "payload_hex": "ff",
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "empty-payload",
+   "payload_hex": "",
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "",
+     "status": "invalid_frame",
+     "diagnostic": {
+      "code": "invalid_frame",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    },
+    "close": true
+   }
+  },
+  {
+   "name": "stream-two-frames",
+   "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d",
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     },
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "stream-reads-1-byte",
+   "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d",
+   "read_size": 1,
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     },
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "stream-reads-3-bytes",
+   "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d",
+   "read_size": 3,
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "stream-short-read-truncated",
+   "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d000000467b22626f64",
+   "read_size": 2,
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     },
+     {
+      "protocol": "1.0",
+      "request_id": "",
+      "status": "invalid_frame",
+      "diagnostic": {
+       "code": "invalid_frame",
+       "stage": "protocol",
+       "message": {
+        "$type": "string"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "max-frame-unknown-envelope-key",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "r-p",
+    "operation": "inspect",
+    "body": {}
+   },
+   "pad_to": {
+    "in": "envelope",
+    "key_prefix": "pad",
+    "size": 1048576
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-p",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "max-frame-unknown-body-key",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "r-q",
+    "operation": "inspect",
+    "body": {}
+   },
+   "pad_to": {
+    "in": "body",
+    "key_prefix": "pad",
+    "size": 1048576
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-q",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "stream-writes-3-bytes",
+   "stream_hex": "000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d",
+   "write_size": 3,
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     },
+     {
+      "protocol": "1.0",
+      "request_id": "r-ok",
+      "status": "ok",
+      "result": {
+       "cursor": "",
+       "state": {
+        "schema": "local-lifecycle/v1",
+        "heads": {},
+        "sources": [],
+        "plans": [],
+        "events": [],
+        "requests": {},
+        "workers": {},
+        "receipts": [],
+        "tasks": {},
+        "outbox": {}
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "stream-writes-1-byte",
+   "stream_hex": "000001",
+   "write_size": 1,
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "",
+      "status": "invalid_frame",
+      "diagnostic": {
+       "code": "invalid_frame",
+       "stage": "protocol",
+       "message": {
+        "$type": "string"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "duplicate-surrogate-key",
+   "payload_text": "{\"\\ud800\":0,\"\\ud800\":1}",
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "stream-duplicate-surrogate-key",
+   "stream_hex": "000000177b225c7564383030223a302c225c7564383030223a317d",
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "",
+      "status": "invalid_request",
+      "diagnostic": {
+       "code": "invalid_request",
+       "stage": "protocol",
+       "message": {
+        "$type": "string"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "stream-truncated-header",
+   "stream_hex": "000001",
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "",
+      "status": "invalid_frame",
+      "diagnostic": {
+       "code": "invalid_frame",
+       "stage": "protocol",
+       "message": {
+        "$type": "string"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "stream-oversized",
+   "stream_hex": "001000017b7d",
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "",
+      "status": "invalid_frame",
+      "diagnostic": {
+       "code": "invalid_frame",
+       "stage": "protocol",
+       "message": {
+        "$type": "string"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "stream-truncated-payload",
+   "stream_hex": "0000000a7b7d",
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "",
+      "status": "invalid_frame",
+      "diagnostic": {
+       "code": "invalid_frame",
+       "stage": "protocol",
+       "message": {
+        "$type": "string"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "stream-empty-frame-closes",
+   "stream_hex": "00000000000000467b22626f6479223a7b7d2c226f7065726174696f6e223a22696e7370656374222c2270726f746f636f6c223a22312e30222c22726571756573745f6964223a22722d6f6b227d",
+   "operation": "inspect",
+   "expect": {
+    "responses": [
+     {
+      "protocol": "1.0",
+      "request_id": "",
+      "status": "invalid_frame",
+      "diagnostic": {
+       "code": "invalid_frame",
+       "stage": "protocol",
+       "message": {
+        "$type": "string"
+       }
+      }
+     }
+    ]
+   }
+  }
+ ]
+}
