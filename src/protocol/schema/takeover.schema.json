@@ -1,0 +1,121 @@
+{
+ "$defs": {
+  "request_body": {
+   "additionalProperties": false,
+   "properties": {
+    "checkpoint": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "expected_revision": {
+     "type": "string"
+    },
+    "owner": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "reason": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "request_key": {
+     "maxLength": 128,
+     "minLength": 1,
+     "type": "string"
+    },
+    "task_id": {
+     "minLength": 1,
+     "type": "string"
+    }
+   },
+   "required": [
+    "checkpoint",
+    "expected_revision",
+    "owner",
+    "reason",
+    "request_key",
+    "task_id"
+   ],
+   "type": "object"
+  },
+  "result": {
+   "additionalProperties": false,
+   "properties": {
+    "cursor": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "result": {
+     "additionalProperties": false,
+     "properties": {
+      "checkpoint": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "correction_snapshot": {
+       "type": "string"
+      },
+      "function": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "note": {
+       "type": "string"
+      },
+      "observation_ref": {
+       "pattern": "^sha256:[0-9a-f]{64}$",
+       "type": "string"
+      },
+      "owner": {
+       "type": "string"
+      },
+      "scope": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "status": {
+       "enum": [
+        "open",
+        "working",
+        "complete"
+       ],
+       "type": "string"
+      },
+      "task_id": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "token": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "observation_ref",
+      "function",
+      "scope",
+      "status",
+      "checkpoint",
+      "owner",
+      "token",
+      "note",
+      "task_id"
+     ],
+     "type": "object"
+    },
+    "reused": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "cursor",
+    "result",
+    "reused"
+   ],
+   "type": "object"
+  }
+ },
+ "$id": "https://github.com/mohanraj00/entelos/blob/main/src/protocol/schema/takeover.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "takeover",
+ "x-entelos-access": "write"
+}

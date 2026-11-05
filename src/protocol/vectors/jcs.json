@@ -1,0 +1,25 @@
+{
+ "description": "RFC 8785 canonical form. The key-order case is the example in RFC 8785 section 3.2.3.",
+ "cases": [
+  {
+   "name": "key-order-utf16",
+   "input": "{\"\\u20ac\":\"Euro Sign\",\"\\r\":\"Carriage Return\",\"\\ufb33\":\"Hebrew Letter Dalet With Dagesh\",\"1\":\"One\",\"\\ud83d\\ude00\":\"Emoji: Grinning Face\",\"\\u0080\":\"Control\",\"\\u00f6\":\"Latin Small Letter O With Diaeresis\"}",
+   "canonical": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😀\":\"Emoji: Grinning Face\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}"
+  },
+  {
+   "name": "whitespace-and-nesting",
+   "input": "{ \"b\" : [ 1 , true , null ] , \"a\" : { \"d\" : \"x\" , \"c\" : \"\" } }",
+   "canonical": "{\"a\":{\"c\":\"\",\"d\":\"x\"},\"b\":[1,true,null]}"
+  },
+  {
+   "name": "string-escapes",
+   "input": "\"tab\\t quote\\\" slash\\/ control\\u0001 line\\u2028\"",
+   "canonical": "\"tab\\t quote\\\" slash/ control\\u0001 line \""
+  },
+  {
+   "name": "negative-integer",
+   "input": "[-0,-17,9007199254740991]",
+   "canonical": "[0,-17,9007199254740991]"
+  }
+ ]
+}

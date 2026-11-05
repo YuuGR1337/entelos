@@ -1,0 +1,34 @@
+{
+ "$defs": {
+  "request_body": {
+   "additionalProperties": false,
+   "properties": {
+    "cursor": {
+     "type": "string"
+    }
+   },
+   "required": [],
+   "type": "object"
+  },
+  "result": {
+   "additionalProperties": false,
+   "properties": {
+    "cursor": {
+     "type": "string"
+    },
+    "state": {
+     "type": "object"
+    }
+   },
+   "required": [
+    "cursor",
+    "state"
+   ],
+   "type": "object"
+  }
+ },
+ "$id": "https://github.com/mohanraj00/entelos/blob/main/src/protocol/schema/inspect.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "inspect",
+ "x-entelos-access": "read"
+}
