@@ -272,6 +272,89 @@
    }
   },
   {
+   "name": "date-trailing-newline",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-13",
+    "operation": "describe",
+    "body": {
+     "function": "record.visible",
+     "date": "2026-11-15\n"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-13",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "reference-trailing-newline",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-14",
+    "operation": "record",
+    "body": {
+     "ref": "sha256:0000000000000000000000000000000000000000000000000000000000000000\n",
+     "kind": "source"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-14",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "interval-trailing-newline",
+   "request": {
+    "protocol": "1.0",
+    "request_id": "b-15",
+    "operation": "source",
+    "body": {
+     "function": "record.visible",
+     "from": "2026-11-01",
+     "until": "2026-12-01\n",
+     "text": "Archived records are not visible.",
+     "reason": "initial rule",
+     "expected_revision": "",
+     "request_key": "k-1"
+    }
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "b-15",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
    "name": "enum-value",
    "request": {
     "protocol": "1.0",

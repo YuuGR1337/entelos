@@ -4,9 +4,11 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import struct
 import sys
 import tempfile
+import traceback
 
 HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(HERE))
@@ -77,7 +79,11 @@ def padded(request,pad):
     return ra.canonical(build(pad['key_prefix']+'x'*room))
 
 def frames(raw):
-    """Split the output into frames. A partial frame is an error, not a crash."""
+    """Split the output into frame objects. A partial frame is an error, not a crash."""
+    return [value for value,payload in framed(raw)]
+
+def framed(raw):
+    """Split the output into (object, exact payload bytes) pairs."""
     out=[];stream=io.BytesIO(raw)
     while True:
         header=stream.read(4)
@@ -85,18 +91,20 @@ def frames(raw):
         if len(header)<4:raise ValueError('output ends inside a frame header')
         size=struct.unpack('>I',header)[0];body=stream.read(size)
         if len(body)<size:raise ValueError('output ends inside a frame payload')
-        out.append(json.loads(body))
+        out.append((json.loads(body),body))
 
 def run_file(path):
+    """Run one session file on a fresh store. If a step fails, keep the store directory under WORK."""
     doc=json.loads(path.read_text());errors=[];bound={}
-    with tempfile.TemporaryDirectory(dir=WORK) as directory:
-        host=Host(GitStore(Path(directory)/'store.git'),NoRuntime(),doc['context']);adapter=ra.Adapter(host)
-        for step in doc['steps']:
-            name=path.name+':'+step['name']
-            # An exception in one step is a vector error. The runner continues with the next step.
-            try:errors+=run_step(adapter,step,bound,name)
-            except Exception as e:errors.append(name+': raised '+type(e).__name__+': '+ascii(str(e))[:200])
-    return len(doc['steps']),errors
+    directory=Path(tempfile.mkdtemp(prefix=path.stem+'-',dir=WORK))
+    host=Host(GitStore(directory/'store.git'),NoRuntime(),doc['context']);adapter=ra.Adapter(host)
+    for step in doc['steps']:
+        name=path.name+':'+step['name']
+        # An exception in one step is a vector error. The record keeps the full text and the traceback.
+        try:errors+=run_step(adapter,step,bound,name)
+        except Exception:errors.append(name+': raised\n'+traceback.format_exc())
+    if errors:return len(doc['steps']),errors,str(directory)
+    shutil.rmtree(directory);return len(doc['steps']),errors,None
 
 def run_step(adapter,step,bound,name):
     errors=[];expect=step['expect']
@@ -105,11 +113,12 @@ def run_step(adapter,step,bound,name):
         reader=Chunked(data,step['read_size']) if 'read_size' in step else io.BytesIO(data)
         out=ShortWriter(step['write_size']) if 'write_size' in step else io.BytesIO()
         adapter.serve(reader,out)
-        raw=out.getvalue();got=frames(raw)
+        pairs=framed(out.getvalue());got=[r for r,payload in pairs]
         errors+=match(expect['responses'],got,bound,name)
         errors+=[name+': response exceeds the frame bound' for r in got if len(ra.canonical(r))>ra.MAX_FRAME]
-        for r in got:
-            errors+=[name+': not canonical'] if ra.canonical(r) not in raw else []
+        for i,(r,payload) in enumerate(pairs):
+            # Each frame payload must be exactly the canonical bytes of its own object.
+            errors+=[name+'[%d]: payload is not canonical'%i] if payload!=ra.canonical(r) else []
             errors+=shape(r,step.get('operation'))
         return errors
     if 'pad_to' in step:
@@ -136,6 +145,14 @@ def coverage():
         if set(body['properties'])!=want:errors.append(op+': schema fields differ from the Host table')
         if not set(body['required'])<=want:errors.append(op+': required field outside the Host table')
         if (ra.OPERATIONS[op]['x-entelos-access']=='read')!=(op in READS):errors.append(op+': access differs')
+    def patterns(node,where):
+        if isinstance(node,dict):
+            for k,v in node.items():
+                if k=='pattern' and not (v.startswith('^') and v.endswith('$')):errors.append(where+': pattern must start with ^ and end with $')
+                patterns(v,where)
+        elif isinstance(node,list):
+            for v in node:patterns(v,where)
+    for name,doc in [('envelope',{'$defs':ra.ENVELOPE})]+sorted(ra.OPERATIONS.items()):patterns(doc,name)
     return errors
 
 class LargeHost:
@@ -160,11 +177,15 @@ class FloatHost:
     """A stub Host whose result is outside the protocol value domain."""
     def handle(self,q):return {'cursor':'','state':{'ratio':0.5}}
 
+class IntKeyHost:
+    """A stub Host whose result has an object key that is not a string."""
+    def handle(self,q):return {1:'x'}
+
 def internal_errors():
     """An unexpected Host failure gives one internal_error frame with no exception text."""
     errors=[];request=ra.canonical({'protocol':'1.0','request_id':'int','operation':'inspect','body':{}})
     want={'protocol':'1.0','request_id':'int','status':'internal_error','diagnostic':{'code':'internal_error','stage':'host','message':{'$type':'string'}}}
-    for host in (RaisingHost(),FloatHost()):
+    for host in (RaisingHost(),FloatHost(),IntKeyHost()):
         name='internal:'+type(host).__name__
         try:
             out=io.BytesIO();ra.Adapter(host).serve(io.BytesIO(struct.pack('>I',len(request))+request),out)
@@ -190,13 +211,30 @@ def jcs_vectors():
         if got!=case['canonical']:errors.append('jcs:'+case['name']+': '+got)
     return len(doc['cases']),errors
 
+def runner_self_test():
+    """A session file with one failed step and one step that raises. The store must stay, with a traceback."""
+    errors=[];folder=WORK/'self-test';folder.mkdir(parents=True,exist_ok=True);path=folder/'session-self-test.json'
+    context=json.loads((HERE/'vectors/session-envelope.json').read_text())['context']
+    path.write_text(json.dumps({'context':context,'steps':[
+        {'name':'wrong-expectation','request':{'protocol':'1.0','request_id':'t','operation':'inspect','body':{}},'expect':{'response':{}}},
+        {'name':'bad-hex','payload_hex':'zz','expect':{'response':{}}}]}))
+    n,found,kept=run_file(path)
+    if len(found)!=2:errors.append('self-test: expected 2 step errors, got %d'%len(found))
+    if not any('Traceback (most recent call last)' in e and 'ValueError' in e for e in found):errors.append('self-test: no traceback in the error record')
+    if not kept or not (Path(kept)/'store.git').is_dir():errors.append('self-test: the failed store was not kept')
+    # This failure is expected. Delete only the self-test files when the self-test passes.
+    if not errors:
+        shutil.rmtree(kept);shutil.rmtree(folder)
+    return errors
+
 def main():
-    WORK.mkdir(parents=True,exist_ok=True);total=0;errors=coverage()+bounds()+internal_errors()
+    WORK.mkdir(parents=True,exist_ok=True);total=0;kept=[];errors=coverage()+bounds()+internal_errors()+runner_self_test()
     n,e=jcs_vectors();total+=n;errors+=e
     n,e=schema_vectors();total+=n;errors+=e
     for path in sorted((HERE/'vectors').glob('session-*.json')):
-        n,e=run_file(path);total+=n;errors+=e
-    result={'successful':not errors and total>0,'vectors':total,'errors':errors}
+        n,e,k=run_file(path);total+=n;errors+=e
+        if k:kept.append(k)
+    result={'successful':not errors and total>0,'vectors':total,'errors':errors,'kept_stores':kept}
     (WORK/'test-results.json').write_text(json.dumps(result,indent=2)+'\n')
     print(json.dumps(result,indent=2));return 0 if result['successful'] else 1
 if __name__=='__main__':raise SystemExit(main())

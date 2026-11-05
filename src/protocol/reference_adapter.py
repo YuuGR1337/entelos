@@ -1,5 +1,6 @@
 """Reference adapter: the versioned wire protocol in front of the local lifecycle Host."""
 import json
+import re
 from pathlib import Path
 import struct
 import sys
@@ -35,6 +36,7 @@ def jcs(value):
         return json.dumps(value,ensure_ascii=False)
     if isinstance(value,list):return '['+','.join(jcs(x) for x in value)+']'
     if isinstance(value,dict):
+        if any(not isinstance(k,str) for k in value):raise ValueError('an object key must be a string')
         keys=sorted(value,key=lambda k:k.encode('utf-16-be'))
         return '{'+','.join(jcs(k)+':'+jcs(value[k]) for k in keys)+'}'
     raise ValueError('value outside the protocol value domain: '+type(value).__name__)
@@ -75,9 +77,9 @@ def validate(schema,value,where,root):
     if isinstance(value,str):
         if len(value)<schema.get('minLength',0):raise ProtocolError('invalid_request',where+' is too short')
         if 'maxLength' in schema and len(value)>schema['maxLength']:raise ProtocolError('invalid_request',where+' is too long')
-        if 'pattern' in schema:
-            import re
-            if not re.search(schema['pattern'],value):raise ProtocolError('invalid_request',where+' does not match its pattern')
+        # Each schema pattern is anchored with ^ and $. In Python, $ also matches before a final newline,
+        # so the check uses fullmatch, as $ does in ECMA-262.
+        if 'pattern' in schema and not re.fullmatch(schema['pattern'],value):raise ProtocolError('invalid_request',where+' does not match its pattern')
     if isinstance(value,list):
         if len(value)<schema.get('minItems',0):raise ProtocolError('invalid_request',where+' has too few items')
         for i,item in enumerate(value):

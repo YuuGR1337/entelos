@@ -166,6 +166,29 @@
    }
   },
   {
+   "name": "version-trailing-newline",
+   "request": {
+    "protocol": "1.0\n",
+    "request_id": "r-nl",
+    "operation": "inspect",
+    "body": {}
+   },
+   "expect": {
+    "response": {
+     "protocol": "1.0",
+     "request_id": "r-nl",
+     "status": "invalid_request",
+     "diagnostic": {
+      "code": "invalid_request",
+      "stage": "protocol",
+      "message": {
+       "$type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
    "name": "missing-version",
    "request": {
     "request_id": "r-x",

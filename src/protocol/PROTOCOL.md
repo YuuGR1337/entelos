@@ -46,7 +46,10 @@ The receiver rejects these payloads with `invalid_request`:
 - JSON that is not valid UTF-8, or that is not one object;
 - a duplicate key;
 - a number that is not an integer, or an integer outside ±(2^53 − 1);
-- an unknown top-level field, a missing field or a field of the wrong type.
+- an unknown top-level field, a missing field or a field of the wrong type;
+- a string that does not match its schema pattern.
+
+Each schema `pattern` starts with `^` and ends with `$`. The pattern must match the full string, as in ECMA-262. A trailing newline does not match `$`. For example, `"2026-11-15\n"` and `"1.0\n"` are invalid.
 
 A write operation also needs `expected_revision` and `request_key` in its body. A read operation must not have them. The `x-entelos-access` value in each schema file shows the access type. The host context (actor, roles, scope) never comes from a request.
 
@@ -92,7 +95,7 @@ A failure:
 | `host` | The Host failed with an unexpected error (`internal_error`). The message has no exception text and no paths. |
 | `lifecycle`, `admission`, `resolve`, `runtime`, `store`, `codec` | The Host and the store. The codes are the existing `Fault` codes in `src/cel-lifecycle`. |
 
-The protocol adds four codes: `unsupported_version`, `invalid_frame`, `response_too_large` and `internal_error`. The receiver also sends `internal_error` if a Host result is outside the value domain, for example a float. All other codes are the existing `Fault` codes, for example `invalid_request`, `forbidden`, `out_of_scope`, `invalid_interval`, `stale_revision`, `idempotency_conflict` and `artifact_unavailable`.
+The protocol adds four codes: `unsupported_version`, `invalid_frame`, `response_too_large` and `internal_error`. The receiver also sends `internal_error` if a Host result is outside the value domain, for example a float or an object key that is not a string. All other codes are the existing `Fault` codes, for example `invalid_request`, `forbidden`, `out_of_scope`, `invalid_interval`, `stale_revision`, `idempotency_conflict` and `artifact_unavailable`.
 
 `message` is text for a person. A program must use `code` and `stage`. The vectors do not compare `message`.
 
@@ -113,7 +116,9 @@ The expected response must be equal to the actual response, with these markers:
 | `{"$use":"name"}` | request | The bound value. |
 | `{"$type":"string"}` | expected | Any string. |
 
-The runner also checks that each response frame is in the frame bound. It checks each response against the envelope schema and each success result against the result schema of its operation. It checks that each Host operation has one schema file with the same fields as the Host table. A stub Host with a result over the frame bound must give `response_too_large`. A stub Host that raises an exception, and a stub Host that returns a float, must each give one `internal_error` frame.
+The runner also checks that each response frame is in the frame bound. It checks each response against the envelope schema and each success result against the result schema of its operation. It compares the exact payload bytes of each frame with the canonical bytes of its object. It checks that each Host operation has one schema file with the same fields as the Host table. A stub Host with a result over the frame bound must give `response_too_large`. A stub Host that raises an exception, a stub Host that returns a float, and a stub Host that returns `{1: "x"}` must each give one `internal_error` frame.
+
+If a session file has an error, the runner keeps its store directory under the work directory and lists it in `kept_stores`. An error record keeps the full exception text and the traceback.
 
 The Go sidecar (#84) must pass the same vector files.
 
