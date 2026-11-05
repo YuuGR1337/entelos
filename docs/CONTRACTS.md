@@ -141,7 +141,7 @@ An entry has no `executor_id` field, and an unknown field is `invalid_request`. 
 
 The Host makes one receipt record for each entry. The record has two parts:
 
-- The executor claim: `mode` `ingest`, the provenance fields, a `selection` with `function`, `scope`, `date`, `snapshot_ref`, `bundle_ref` and `engine_build` from the snapshot, `response_ref`, `stale_mode` from the snapshot, `stale` and `stale_reason`. `stale_reason` is the statement of the executor. The Host sets `stale` to `true` only if `stale_reason` is not empty.
+- The executor claim: `mode` `ingest`, the provenance fields, a `selection` with `function`, `scope`, `date`, `snapshot_ref`, `bundle_ref` and `engine_build` from the snapshot, `response_ref`, `stale_mode` from the snapshot and `stale_reason`. `stale_reason` is the statement of the executor. The receipt also has `stale`, but `stale` is not part of the claim. The Host derives it from the claim: `stale` is `true` only if `stale_reason` is not empty.
 - The host fields: `host_stale_reason`, the view of the Host at ingest, and `host_checked_events`, the number of registry events that the Host examined. A later event can change the view of the Host, but not a stored receipt.
 
 The record has no `lifecycle_build`, so a new Host build makes the same claim from the same entry.
@@ -155,7 +155,7 @@ Ingest is idempotent on the pair (executor ID, cursor). The Host reads the recei
 
 The Host examines the entries in the list order. Thus a reorder in the list is a gap, for example cursor 2 before cursor 1. A repeated cursor in one list is a duplicate. To continue after a gap, send the log again from the first cursor that is not in the store. A list can start before the end of the log, and the earlier entries are duplicates. A fault stops the full ingest, so a failed ingest publishes no part of its entries.
 
-The result is `executor_id`, `log_cursor` (the last cursor of the log), `added` (the number of new receipts) and `receipts` (the receipt reference of each entry, in the list order). A second ingest of the same log with a new `request_key` gives `added` 0 and the same `receipts`. It publishes a new root that has only the new request record. A retry with the same `request_key` gives the first result, as for each write.
+The result is `executor_id`, `log_cursor` (the last cursor of the log), `added` (the number of new receipts) and `receipts` (the receipt reference of each entry, in the list order). A second ingest of the same log with a new `request_key` gives `added` 0 and the same `receipts`. It publishes a new root that has only the new request record. A retry with the same `request_key` gives the first result, as for each write. The stored request binds the context `actor`, `scope`, `runner_actor`, `worker` and `upload_inputs`. Thus the same `request_key` from a context with another `worker` or upload policy is `idempotency_conflict`. This rule applies to each write, also to `invoke`, `replay` and `restate`.
 
 The Host and an ingest share one log for each executor ID. If an ingest uses the executor ID of a Host worker at a cursor that the Host wrote, the result is `ingest_conflict`. Use a different executor ID for each executor.
 

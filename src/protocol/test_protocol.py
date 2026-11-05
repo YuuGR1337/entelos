@@ -70,8 +70,13 @@ def validate(schema,value,where,root):
         # so the check uses fullmatch, as $ does in ECMA-262.
         if 'pattern' in schema and not re.fullmatch(schema['pattern'],value):raise SchemaError(where+' does not match its pattern')
     if isinstance(value,int) and not isinstance(value,bool):
-        if 'minimum' in schema and value<schema['minimum']:raise SchemaError(where+' is too small')
-        if 'maximum' in schema and value>schema['maximum']:raise SchemaError(where+' is too large')
+        for key in ('minimum','maximum'):
+            if key not in schema:continue
+            bound=schema[key]
+            # A bound that is not an exact integer is a schema error. It never compares as another value.
+            if isinstance(bound,float) and bound.is_integer():bound=int(bound)
+            if isinstance(bound,bool) or not isinstance(bound,int):raise ValueError('schema bound is not an integer: '+repr(schema[key]))
+            if value<bound if key=='minimum' else value>bound:raise SchemaError(where+' is out of range')
     if isinstance(value,list):
         if len(value)<schema.get('minItems',0):raise SchemaError(where+' has too few items')
         for i,item in enumerate(value):

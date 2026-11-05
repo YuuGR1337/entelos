@@ -628,3 +628,22 @@ func TestIngestCannotReplaceAHostReceipt(t *testing.T) {
 		"inputs_ref": InputDigest(Object{"state": "approved"}), "response": Object{"bundle_ref": snapshot["bundle_ref"]}}
 	f.expect("ingest_conflict")(f.host("worker", nil).Handle(f.request("ingest", Object{"entries": Array{entry}})))
 }
+
+// An invoke receipt takes its executor ID and log cursor from the context
+// worker. Thus the same request key from a caller with another worker is
+// idempotency_conflict, not a reuse of the receipt of the first worker.
+func TestInvokeRequestKeyBindsTheWorker(t *testing.T) {
+	f := newFixture(t)
+	view, _ := f.store.Read(nil)
+	snapshot, _ := view.Get(f.pin("correction_snapshot"), "snapshot")
+	q := f.request("invoke", Object{"function": "record.visible", "date": "2026-11-15", "expected_bundle_ref": snapshot["bundle_ref"],
+		"inputs": Object{"state": "reviewed", "archived": false}})
+	f.ok(f.host("caller", nil).Handle(copyObject(q)))
+	before := f.root()
+	other := f.host("caller", func(c Object) { c["worker"] = "other-worker" })
+	f.expect("idempotency_conflict")(other.Handle(copyObject(q)))
+	view, _ = f.store.Read(nil)
+	if f.root() != before || lookup(view.State["executors"], "other-worker", nil) != nil {
+		t.Fatal("a conflict changed the state")
+	}
+}

@@ -214,7 +214,13 @@ func (h *Host) Handle(request any) (result any, err error) {
 			request2[k] = v
 		}
 	}
-	payload := Object{"request": request2, "actor": h.ctx("actor"), "scope": h.ctx("scope"), "policy_runner": h.ctx("runner_actor")}
+	// The payload binds each context field that changes the result. A
+	// receipt takes its executor ID and log cursor from worker, and
+	// upload_inputs changes what ingest stores. Thus a reuse of a request
+	// key from another context is idempotency_conflict, not a reuse.
+	upload, _ := h.Context["upload_inputs"].(bool)
+	payload := Object{"request": request2, "actor": h.ctx("actor"), "scope": h.ctx("scope"), "policy_runner": h.ctx("runner_actor"),
+		"worker": h.ctx("worker"), "upload_inputs": upload}
 	out, err := h.Store.Transact(q["expected_revision"], q["request_key"], payload, func(v *View) (value any, err error) {
 		defer func() {
 			if r := recover(); r != nil {

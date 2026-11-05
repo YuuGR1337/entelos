@@ -419,3 +419,28 @@ func TestIngestRefusesCorruptExecutorState(t *testing.T) {
 	}()
 	setExecutorLog(&View{State: Object{"executors": Array{}}}, "executor-a", Array{})
 }
+
+// The request record binds the context worker and upload policy. The same
+// request key from a Host with another worker, or with another upload
+// policy, is idempotency_conflict, and the state does not change.
+func TestIngestRequestKeyBindsTheExecutor(t *testing.T) {
+	host, store, entry := ingestHost(t, nil)
+	q := ingestRequest(store, "shared-key", entry)
+	if _, err := host.Handle(copyObject(q)); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := store.Read(nil)
+	for _, change := range []Object{{"actor": "executor-b", "worker": "executor-b"}, {"upload_inputs": true}} {
+		other, err := NewHost(store, nil, merge(host.Context, change))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := other.Handle(copyObject(q)); codeOf(err) != "idempotency_conflict" {
+			t.Fatalf("%v: got %v, want idempotency_conflict", change, err)
+		}
+	}
+	after, _ := store.Read(nil)
+	if after.Cursor != before.Cursor || len(after.State["executors"].(Object)) != 1 {
+		t.Fatalf("a conflict changed the state: %s", Encode(after.State["executors"]))
+	}
+}
