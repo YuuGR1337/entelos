@@ -129,21 +129,27 @@ The Host is the executor for `invoke`, `replay` and `restate`. Each of these rec
 | `stale_reason` | Optional: `expired`, `revoked` or an empty string. |
 | `inputs` | Optional: the raw inputs. Only the upload policy permits this field. |
 
-The entry date must agree with an activation of the pinned snapshot. The Host examines the `enable` events of the registry for this function and scope that name the snapshot:
+An `enable` event of the registry for this function and scope must name the pinned snapshot and have `from` at or before the entry date. Else the result is `out_of_scope` (stage `resolve`). The Host always keeps the answer of a known activation, because a user saw it. It does not refuse an entry because the stale reason of the executor differs from its own view. This rule also applies to a `fail_closed` snapshot.
 
-1. If `stale_reason` is not empty and the `stale_mode` of the snapshot is not `continue_stale`, the result is `activation_expired` or `activation_revoked`. These are the codes that `invoke` gives in the `fail_closed` mode, so a `fail_closed` revision has no stale receipt.
-2. If `stale_reason` is empty or `revoked`, one of these events must have `from` at or before the date and `until` after the date.
-3. If `stale_reason` is `expired`, one of these events must have `from` and `until` at or before the date.
-4. If no event agrees, the result is `out_of_scope` (stage `resolve`).
+The Host computes its own view with the masks that `invoke` uses (see [Expiry and revocation](#expiry-and-revocation)):
+
+1. If an `enable` event of the snapshot is live at the date, the view is an empty string.
+2. Else, if the date is in the interval of an `enable` event of the snapshot, a mask removed it. The view is `revoked`.
+3. Else, the view is `expired`.
 
 An entry has no `executor_id` field, and an unknown field is `invalid_request`. Thus a request cannot name another executor. To ingest for a different executor, the embedding host installs a context with that `worker` value.
 
-The Host makes one receipt record for each entry: `mode` `ingest`, the provenance fields, a `selection` with `function`, `scope`, `date`, `snapshot_ref`, `bundle_ref` and `engine_build` from the snapshot, `response_ref`, `stale_mode` from the snapshot, `stale` and `stale_reason`. The record has no `lifecycle_build`, so a new Host build makes the same record from the same entry.
+The Host makes one receipt record for each entry. The record has two parts:
 
-Ingest is idempotent on the pair (executor ID, cursor). The Host compares the content reference of the new receipt with the receipt in the log at that cursor:
+- The executor claim: `mode` `ingest`, the provenance fields, a `selection` with `function`, `scope`, `date`, `snapshot_ref`, `bundle_ref` and `engine_build` from the snapshot, `response_ref`, `stale_mode` from the snapshot, `stale` and `stale_reason`. `stale` and `stale_reason` are the statement of the executor.
+- The host fields: `host_stale_reason`, the view of the Host at ingest, and `host_checked_events`, the number of registry events that the Host examined. A later event can change the view of the Host, but not a stored receipt.
 
-1. If the cursor is in the log and the receipts are equal, the entry is a duplicate. It adds no record.
-2. If the cursor is in the log and the receipts differ, the result is `ingest_conflict`. A different response, input digest, snapshot, date or stale reason is a different payload.
+The record has no `lifecycle_build`, so a new Host build makes the same claim from the same entry.
+
+Ingest is idempotent on the pair (executor ID, cursor). The Host reads the receipt in the log at that cursor and compares its executor claim with the claim of the new entry. The comparison ignores the host fields, so a later event does not make a re-ingest of the same log a conflict:
+
+1. If the cursor is in the log and the claims are equal, the entry is a duplicate. It adds no receipt, and the result names the stored receipt.
+2. If the cursor is in the log and the claims differ, the result is `ingest_conflict`. A different response, input digest, snapshot, date or stale reason is a different payload.
 3. If the cursor is the next cursor after the log, the Host appends the receipt.
 4. If the cursor is after the next cursor, the result is `ingest_gap`. The Host does not fill a gap.
 
@@ -153,12 +159,19 @@ The result is `executor_id`, `log_cursor` (the last cursor of the log), `added` 
 
 The Host and an ingest share one log for each executor ID. If an ingest uses the executor ID of a Host worker at a cursor that the Host wrote, the result is `ingest_conflict`. Use a different executor ID for each executor.
 
-The raw inputs stay with the executor by default. The host context field `upload_inputs` is the upload policy. It is optional, and it must be a boolean. If it is not `true`, an entry with `inputs` is `upload_not_permitted`, and the Host stores only the digest. If it is `true`, the canonical bytes of `inputs` must have the digest `inputs_ref`, or the result is `input_mismatch`. The Host then stores the bytes at that reference. The receipt is the same with and without the upload. A duplicate entry does not upload its inputs.
+The raw inputs stay with the executor by default. The host context field `upload_inputs` is the upload policy. It is optional, and it must be a boolean. If it is not `true`, an entry with `inputs` is `upload_not_permitted`, and the Host stores only the digest. If it is `true`, the canonical bytes of `inputs` must have the digest `inputs_ref`, or the result is `input_mismatch`. The Host then stores the bytes at that reference. The receipt is the same with and without the upload. A duplicate entry with `inputs` also stores them, so an executor can upload inputs after the first ingest.
+
+To audit the ingested receipts, use `inspect` for `state.executors`, then read each receipt with `receipt`:
+
+- A receipt with `stale` `true` is stale in the claim of the executor.
+- A receipt with a `host_stale_reason` that is not empty is stale in the view of the Host.
+- A receipt with `stale_reason` different from `host_stale_reason` is a mismatch.
+- A stale receipt with `stale_mode` `fail_closed` is an answer that `invoke` refuses. The Host keeps it to record what the user saw.
 
 These are the limits of ingest:
 
 - The Host does not run the rule again. An ingested receipt is the statement of the executor, bound to its executor ID and the pinned snapshot. A content reference is not a signature.
-- The Host does not compare an empty stale reason and `revoked` for a date in an activation interval. A later mask can revoke an activation after the executor wrote its entry, and the executor did not know about it at that time. Thus the Host cannot disprove the stale reason, and the reason stays the statement of the executor.
+- A mask can revoke an activation after the executor wrote its entry, and the executor did not know about it at that time. Thus a difference between `stale_reason` and `host_stale_reason` is not an error. It is a fact for an auditor.
 - An ingested receipt is not in `state.receipts`. It has no registry selection, so `replay` and `restate` give `artifact_unavailable`. Use `inspect` for `state.executors` and `receipt` to read each ingested receipt.
 - There is no network transport for ingest. The executor sends its log through the JSONL host or the local socket.
 

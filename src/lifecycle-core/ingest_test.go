@@ -259,7 +259,7 @@ func TestIngestKeepsRawInputsWithTheExecutorByDefault(t *testing.T) {
 }
 
 // Malformed entries are invalid requests. A pinned snapshot that is not in
-// the store, a date that no activation of the snapshot covers, or a response
+// the store, a date before each activation of the snapshot, or a response
 // for another bundle, also stops the ingest.
 func TestIngestRefusesMalformedEntries(t *testing.T) {
 	host, store, entry := ingestHost(t, nil)
@@ -278,8 +278,6 @@ func TestIngestRefusesMalformedEntries(t *testing.T) {
 		"bad-stale-reason": {Array{merge(entry, Object{"stale_reason": "late"})}, "invalid_request"},
 		"cursor-too-large": {Array{merge(entry, Object{"cursor": Int{"9007199254740992"}})}, "invalid_request"},
 		"before-from":      {Array{merge(entry, Object{"date": "2026-10-15"})}, "out_of_scope"},
-		"after-until":      {Array{merge(entry, Object{"date": "2026-12-15"})}, "out_of_scope"},
-		"expired-in-range": {Array{merge(entry, Object{"stale_reason": "expired"})}, "out_of_scope"},
 		"other-bundle":     {Array{merge(entry, Object{"response": merge(response, Object{"bundle_ref": "sha256:" + strings.Repeat("c", 64)})})}, "artifact_mismatch"},
 	} {
 		if _, err := host.Handle(ingestRequest(store, name, c.entries...)); codeOf(err) != c.code {
@@ -292,8 +290,9 @@ func TestIngestRefusesMalformedEntries(t *testing.T) {
 	}
 }
 
-// An ingested receipt has no Host selection. It is not in state.receipts,
-// so replay and restatement refuse it.
+// An ingested receipt has a selection from the pinned snapshot, but no
+// lifecycle_build, report or decision. It is not in state.receipts, so
+// replay and restatement refuse it.
 func TestIngestedReceiptIsNotReplayed(t *testing.T) {
 	host, store, entry := ingestHost(t, nil)
 	out, err := host.Handle(ingestRequest(store, "k-1", entry))
@@ -313,10 +312,11 @@ func TestIngestedReceiptIsNotReplayed(t *testing.T) {
 	}
 }
 
-// The snapshot must be for a function that the context installs. A stale
-// receipt for a fail_closed snapshot gives the code that invoke gives in
-// that mode. A live receipt for the same snapshot is accepted.
-func TestIngestChecksTheFunctionAndTheStaleMode(t *testing.T) {
+// The Host keeps each answer and records its own stale view beside the
+// claim of the executor. A later mask does not make a re-ingest of the same
+// log a conflict. A fail_closed snapshot also keeps a stale answer. A
+// snapshot for another function is out_of_scope.
+func TestIngestKeepsTheAnswerAndMarksTheHostView(t *testing.T) {
 	host, store, entry := ingestHost(t, nil)
 	other := Object{"function": "other.function", "scope": "tenant-example", "from": "2026-11-01", "until": "2026-12-01",
 		"bundle_ref": at(entry, "response", "bundle_ref"), "engine_build": "sha256:" + strings.Repeat("e", 64), "stale_mode": "continue_stale"}
@@ -325,24 +325,77 @@ func TestIngestChecksTheFunctionAndTheStaleMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	view, _ := store.Read(nil)
+	pinned := stringList(view.State["events"])[0]
+	suspend := Object{"kind": "suspend", "function": "record.visible", "scope": "tenant-example", "from": "2026-11-20", "until": "2026-12-01",
+		"targets": Array{pinned}, "reason": "test"}
 	enable := merge(closed, Object{"kind": "enable", "snapshot_ref": refs[1], "targets": Array{}})
 	if _, err := seedStore(store, "seed-3", Array{Object{"put": "event", "value": enable, "list": "events"}}); err != nil {
 		t.Fatal(err)
 	}
-	for name, c := range map[string]struct {
-		fields Object
-		code   string
+	if _, err := host.Handle(ingestRequest(store, "other", merge(entry, Object{"snapshot_ref": refs[0]}))); codeOf(err) != "out_of_scope" {
+		t.Fatalf("other-function: got %v", err)
+	}
+	ingest := func(key string, added string, entries ...any) Array {
+		t.Helper()
+		out, err := host.Handle(ingestRequest(store, key, entries...))
+		if err != nil || out.(Object)["result"].(Object)["added"] != (Int{added}) {
+			t.Fatalf("%s: got %v %v", key, out, err)
+		}
+		return out.(Object)["result"].(Object)["receipts"].(Array)
+	}
+	claimRevoked := merge(entry, Object{"cursor": Int{"2"}, "date": "2026-11-16", "stale_reason": "revoked"})
+	first := ingest("k-1", "2", entry, claimRevoked)
+	if _, err := seedStore(store, "suspend", Array{Object{"put": "event", "value": suspend, "list": "events"}}); err != nil {
+		t.Fatal(err)
+	}
+	if again := ingest("k-2", "0", entry, claimRevoked); !equal(again, first) {
+		t.Fatalf("re-ingest after a mask gave %v, want %v", again, first)
+	}
+	later := ingest("k-3", "3",
+		merge(entry, Object{"cursor": Int{"3"}, "date": "2026-11-25"}),
+		merge(entry, Object{"cursor": Int{"4"}, "snapshot_ref": refs[1], "date": "2026-10-15", "stale_reason": "revoked"}),
+		merge(entry, Object{"cursor": Int{"5"}, "snapshot_ref": refs[1]}))
+	view, _ = store.Read(nil)
+	for i, c := range []struct {
+		ref               any
+		claim, host, mode string
 	}{
-		"other-function": {Object{"snapshot_ref": refs[0]}, "out_of_scope"},
-		"closed-revoked": {Object{"snapshot_ref": refs[1], "date": "2026-10-15", "stale_reason": "revoked"}, "activation_revoked"},
-		"closed-expired": {Object{"snapshot_ref": refs[1], "stale_reason": "expired"}, "activation_expired"},
+		{first[0], "", "", "continue_stale"},
+		{first[1], "revoked", "", "continue_stale"},
+		{later[0], "", "revoked", "continue_stale"},
+		{later[1], "revoked", "", "fail_closed"},
+		{later[2], "", "expired", "fail_closed"},
 	} {
-		if _, err := host.Handle(ingestRequest(store, name, merge(entry, c.fields))); codeOf(err) != c.code {
-			t.Errorf("%s: got %v, want %s", name, err, c.code)
+		r := get(view, c.ref, "receipt")
+		if r["stale_reason"] != c.claim || r["host_stale_reason"] != c.host || r["stale_mode"] != c.mode || r["stale"] != (c.claim != "") {
+			t.Errorf("receipt %d: %s", i, Encode(r))
 		}
 	}
-	if _, err := host.Handle(ingestRequest(store, "closed-live", merge(entry, Object{"snapshot_ref": refs[1], "date": "2026-10-15"}))); err != nil {
-		t.Fatalf("closed-live: %v", err)
+}
+
+// If the policy permits upload, a new entry and a duplicate entry both
+// store their inputs. GetRaw gives the canonical bytes. Inputs that differ
+// from inputs_ref give input_mismatch.
+func TestIngestUploadStoresTheInputs(t *testing.T) {
+	host, store, entry := ingestHost(t, func(c Object) { c["upload_inputs"] = true })
+	first := Object{"state": "approved", "archived": false}
+	second := Object{"state": "closed", "archived": false}
+	next := merge(entry, Object{"cursor": Int{"2"}, "inputs_ref": InputDigest(second), "inputs": second})
+	for i, entries := range []Array{{entry}, {merge(entry, Object{"inputs": first}), next}} {
+		if _, err := host.Handle(ingestRequest(store, fmt.Sprint("k-", i), entries...)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	view, _ := store.Read(nil)
+	for _, inputs := range []Object{first, second} {
+		if raw, err := view.GetRaw(InputDigest(inputs), "application/json"); err != nil || string(raw) != string(Encode(inputs)) {
+			t.Errorf("stored inputs %q %v", raw, err)
+		}
+	}
+	bad := merge(entry, Object{"cursor": Int{"3"}, "inputs": second})
+	if _, err := host.Handle(ingestRequest(store, "k-bad", bad)); codeOf(err) != "input_mismatch" {
+		t.Fatalf("got %v, want input_mismatch", err)
 	}
 }
 

@@ -621,40 +621,67 @@ func logCursor(value any) int {
 	return int(c)
 }
 
-// pinnedActivation checks that an enable event of the pinned snapshot
-// covers the date of a log entry. For a stale reason of "" or "revoked",
-// the date must be in the half-open interval of the event. For "expired",
-// the date must be at or after the until date of the event. A stale
-// reason for a fail_closed snapshot is refused with the code that invoke
-// gives in that mode.
-func (h *Host) pinnedActivation(v *View, snapshotRef any, snapshot Object, date, staleReason string) {
-	if staleReason != "" && !equal(lookup(snapshot, "stale_mode", nil), continueStale) {
-		fail("activation_"+staleReason, "the pinned snapshot fails closed, so it has no stale receipt", "resolve")
-	}
+// hostStaleReason gives the view of the Host of the pinned snapshot at the
+// entry date. The Host uses the masks of the registry, as invoke does. The
+// result is "" if an enable event of the snapshot is live at the date. It
+// is "revoked" if the date is in the interval of an enable event of the
+// snapshot, but a mask removes that event. Else it is "expired". If no
+// enable event of the snapshot starts at or before the date, the result is
+// out_of_scope.
+func (h *Host) hostStaleReason(v *View, snapshotRef any, snapshot Object, date string) string {
+	found, inInterval := false, false
 	for _, event := range h.events(v) {
-		if !equal(item(event, "kind"), "enable") || !same(event, snapshot) || !equal(item(event, "snapshot_ref"), snapshotRef) || less(date, item(event, "from")) {
-			continue
-		}
-		if lessEqual(item(event, "until"), date) == (staleReason == "expired") {
-			return
+		if equal(item(event, "kind"), "enable") && same(event, snapshot) && equal(item(event, "snapshot_ref"), snapshotRef) && lessEqual(item(event, "from"), date) {
+			found = true
+			inInterval = inInterval || less(date, item(event, "until"))
 		}
 	}
-	fail("out_of_scope", "no activation of the pinned snapshot covers the entry date and stale reason", "resolve")
+	if !found {
+		fail("out_of_scope", "no activation of the pinned snapshot starts at or before the entry date", "resolve")
+	}
+	_, active := h.live(v, item(snapshot, "function"), date)
+	for _, event := range active {
+		if equal(item(event, "snapshot_ref"), snapshotRef) {
+			return ""
+		}
+	}
+	if inInterval {
+		return "revoked"
+	}
+	return "expired"
+}
+
+// hostFields are the receipt fields that the Host computes at ingest. They
+// are not part of the executor payload, so the conflict check ignores them.
+var hostFields = map[string]bool{"host_stale_reason": true, "host_checked_events": true}
+
+// executorClaim gives a receipt without the host fields.
+func executorClaim(receipt Object) Object {
+	claim := Object{}
+	for k, x := range receipt {
+		if !hostFields[k] {
+			claim[k] = x
+		}
+	}
+	return claim
 }
 
 // ingest records the entries of the local log of the executor in the Host
 // context. The entries are in log order. Ingest is idempotent on the pair
 // (executor ID, cursor):
 //
-//   - A cursor in the log with the same receipt is a duplicate. It adds
-//     no record.
-//   - A cursor in the log with a different receipt is ingest_conflict.
+//   - A cursor in the log with the same executor claim is a duplicate. It
+//     adds no receipt. If it has inputs, the Host stores them.
+//   - A cursor in the log with a different executor claim is
+//     ingest_conflict.
 //   - The next cursor after the log appends the receipt.
 //   - A cursor after the next cursor is ingest_gap.
 //
 // A fault stops the full ingest, so a failed ingest publishes no state.
 // The Host does not run the rule again. An ingested receipt is the
-// statement of the executor, bound to the pinned snapshot.
+// statement of the executor, bound to the pinned snapshot. The Host keeps
+// each answer, because a user saw it. It records its own stale view in
+// host_stale_reason, beside the stale_reason claim of the executor.
 func (h *Host) ingest(v *View, entries any) Object {
 	list, ok := entries.(Array)
 	if !ok || len(list) == 0 {
@@ -698,7 +725,7 @@ func (h *Host) ingest(v *View, entries any) Object {
 		// scoped refuses a snapshot outside the trusted scope or for a
 		// function that the context does not install, as resolve does.
 		snapshot := h.scoped(v, item(entry, "snapshot_ref"), "snapshot")
-		h.pinnedActivation(v, entry["snapshot_ref"], snapshot, date, staleReason.(string))
+		hostReason := h.hostStaleReason(v, entry["snapshot_ref"], snapshot, date)
 		if !equal(lookup(response, "bundle_ref", nil), item(snapshot, "bundle_ref")) {
 			fail("artifact_mismatch", "the response names a bundle that differs from the pinned snapshot", "")
 		}
@@ -709,22 +736,26 @@ func (h *Host) ingest(v *View, entries any) Object {
 			"selection": selection, "inputs_ref": inputsRef, "response_ref": ContentRef(Envelope("application/json", responseBytes)),
 			"executor_id": executor, "log_cursor": Int{strconv.Itoa(cursor)}, "stale_mode": lookup(snapshot, "stale_mode", failClosed),
 			"stale": staleReason != "", "stale_reason": staleReason}
-		ref := ContentRef(Envelope(Media("receipt"), Encode(record)))
+		claim := copyObject(record)
+		record["host_stale_reason"] = hostReason
+		record["host_checked_events"] = Int{strconv.Itoa(pyLen(item(v.State, "events")))}
+		var ref any
 		switch {
 		case cursor <= len(log):
-			if !equal(log[cursor-1], ref) {
+			ref = log[cursor-1]
+			if !equal(executorClaim(get(v, ref, "receipt")), claim) {
 				fail("ingest_conflict", "executor "+executor+" has a different receipt at cursor "+strconv.Itoa(cursor), "")
 			}
 		case cursor == len(log)+1:
-			if hasInputs {
-				v.PutRaw("application/json", Encode(inputs))
-			}
 			v.PutRaw("application/json", responseBytes)
-			v.Put("receipt", record)
+			ref = v.Put("receipt", record)
 			log = append(log, ref)
 			added++
 		default:
 			fail("ingest_gap", "cursor "+strconv.Itoa(cursor)+" does not follow cursor "+strconv.Itoa(len(log))+" of executor "+executor, "")
+		}
+		if hasInputs {
+			v.PutRaw("application/json", Encode(inputs))
 		}
 		refs = append(refs, ref)
 	}
