@@ -2,7 +2,9 @@
 
 This file lists the changes for each snapshot tag. A tag is a stable snapshot to cite and copy. It is not a package release, and it does not promise a stable API or record format.
 
-## Unreleased
+## v0.2.0 (2026-11-06)
+
+This snapshot replaces the Python lifecycle with a Go core and adds a local sidecar and a browser executor. It does not read stores from v0.1.0.
 
 ### Reference code
 
@@ -15,6 +17,28 @@ This file lists the changes for each snapshot tag. A tag is a stable snapshot to
 - Each stored record has the field `format: "entelos.record/1"` (#78). A read of a record without this field, or with an unknown major version, fails closed with `unsupported_record_format`. The new `record-format` storage vector tests this rule. Stores from v0.1.0 are not migrated. See [SUPPORT.md](docs/SUPPORT.md).
 - An expired or revoked activation fails closed by default (#82). The new diagnostics are `activation_expired` and `activation_revoked`. A proposal can declare `stale_mode` `continue_stale`. Then the loaded activation gives the answer, and the receipt has `stale` `true`. Each receipt records `stale_mode`, `stale` and `stale_reason`. See [CONTRACTS.md](docs/CONTRACTS.md#expiry-and-revocation).
 - Each receipt records its provenance (#81): `executor_id`, `log_cursor`, `inputs_ref` and `selection.snapshot_ref`. The new `ingest` operation records an executor log, idempotent on the executor ID and the cursor. It keeps each answer and records the Host stale view in `host_stale_reason`. See [CONTRACTS.md](docs/CONTRACTS.md#receipt-provenance-and-ingest).
+- At ingest, the Host compares the response `implementation_ref` with the snapshot `engine_build` (#108). A different or missing value gives `artifact_mismatch` and stops the ingest. This also applies to an entry from before this change.
+- A storage port has conformance vectors and an in-memory adapter (#79). Both stores pass the storage vectors.
+- A qualification runner interface separates the runner from the Host (#80).
+- Wire protocol 1.0 is the versioned protocol for a client (#83). See [PROTOCOL.md](src/protocol/PROTOCOL.md).
+- `entelos-sidecar` serves this protocol on a local Unix socket (#84). The new example is [sidecar-client](examples/sidecar-client/README.md).
+- A WebAssembly build of the executor runs in a browser and keeps a receipt log (#93). The new example is [browser-executor](examples/browser-executor/README.md).
+
+### Docs
+
+- [Decision 0001](docs/decisions/0001-technology.md) records the technology choice (#85). [Decision 0002](docs/decisions/0002-browser-executor.md) records the browser executor design.
+- The README, [SUPPORT.md](docs/SUPPORT.md) and [SECURITY.md](SECURITY.md) state the limits of the sidecar, ingest and the browser executor.
+
+### Limits
+
+- This snapshot does not read a v0.1.0 store, and there is no migration tool. See [SUPPORT.md](docs/SUPPORT.md).
+- APIs, the protocol and the record format are unstable. The only callable profile is string/bool input and bool output.
+- The sidecar has no authentication. The only access control is the file mode of the socket and of its directory.
+- An ingested receipt is the statement of the executor. The Host does not run the rule again, and a content reference is not a signature.
+- The M5 security review covered the v0.1.0 Python path. Security-relevant M6 pull requests had a security review one at a time. No one repeated the review for the full Go path as one review.
+- The `inspect` and `record` reads do not check the scope. Use one store for each scope.
+- A `request_key` with a NUL byte gives `store_error` on the Git store. The in-memory store accepts this key.
+- Linux and macOS are tested. Windows is not tested. `verify.py` needs a Chromium browser.
 
 ## v0.1.0 (2026-11-04)
 
