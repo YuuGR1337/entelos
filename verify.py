@@ -164,6 +164,26 @@ try:
  client_results=json.loads(client_path.read_text()) if client_path.exists() else {'status':'failed','error':'run.py wrote no results.json','stderr':client.stderr}
  check('sidecar-client','Does a client that talks only to the sidecar socket complete propose, qualify, decide, activate and invoke?',
        client.returncode==0 and client_results['status']=='passed',{k:client_results.get(k) for k in ['status','error','checks']})
+ # The same module in a headless Chromium browser (decision 0002). ENTELOS_BROWSER names the browser; CI sets it.
+ browser_work=w/'browser-vectors';browser_out=w/'executor/browser.json'
+ browser_vectors=run('browser-vectors',[sys.executable,'-B',handoff/'web/browser_check.py','--module',module,'--wasm-exec',lib/'wasm_exec.js','--work',browser_work,'--out',browser_out])
+ browser_result=json.loads(browser_out.read_text()) if browser_out.exists() else {'status':'failed','errors':['browser_check.py wrote no result'],'stderr':browser_vectors.stderr}
+ page=browser_result.get('result') or {}
+ if page.get('vectors'):(w/'executor/browser-page.json').write_text(json.dumps(page['vectors'])+'\n')
+ _,browser_steps=executor_results('browser-page.json') if page.get('vectors') else (None,None)
+ check('browser-executor-vectors','Do the executor vectors pass in a headless browser, with the same entries as the native build except the build and bundle identities?',
+       browser_vectors.returncode==0 and browser_result['status']=='passed' and browser_steps==native_steps and page.get('implementation_ref')==wasm_build.get('implementation_ref')
+       and page.get('tampered',{}).get('diagnostic',{}).get('code')=='artifact_mismatch' and page.get('changed_after_call',{}).get('started') is True
+       and page.get('concurrent_start',{}).get('diagnostic',{}).get('code')=='invalid_request',
+       {'status':browser_result['status'],'errors':browser_result.get('errors'),'browser':browser_result.get('browser'),'timing':page.get('timing'),
+        'user_agent':page.get('user_agent'),'tampered':page.get('tampered'),'concurrent_start':page.get('concurrent_start'),'steps':len(browser_steps or [])})
+ example=run('browser-executor-example',[sys.executable,'-B',ROOT/'examples/browser-executor/run.py','--work',w/'browser-executor','--sidecar',w/'bin/entelos-sidecar',
+             '--cel-binary',wrapper,'--record-bundle',wasm_bundle,'--module',module,'--wasm-exec',lib/'wasm_exec.js'])
+ example_path=w/'browser-executor/results.json'
+ example_results=json.loads(example_path.read_text()) if example_path.exists() else {'status':'failed','error':'run.py wrote no results.json','stderr':example.stderr}
+ check('browser-executor-ingest','Does the browser executor answer from a pin of WASM-qualified Host records, keep its log in IndexedDB, and does the Host ingest that log once?',
+       example.returncode==0 and example_results['status']=='passed',{k:example_results.get(k) for k in ['status','error','timing','user_agent']}
+       |{'checks':[x['name'] for x in example_results.get('checks',[]) if x.get('passed')],'failed':[x for x in example_results.get('checks',[]) if not x.get('passed')]})
  demo=run('consumer-reuse',[sys.executable,'-B',ROOT/'examples/ci-trigger/run.py','--work',w/'reuse','--cel-binary',w/'bin/cel-handoff','--author-binary',w/'bin/cel-expr','--record-bundle',w/'record-bundle','--host',w/'bin/lifecycle-core'])
  reuse=json.loads((w/'reuse/results.json').read_text())
  check('two-consumers-and-baseline','Do both consumer loops and the ordinary-code comparison pass?',demo.returncode==0 and reuse['status']=='passed',{'status':reuse['status'],'checks':reuse['checks'],'measurements':reuse['measurements'],'errors':reuse['errors']})

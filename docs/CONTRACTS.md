@@ -212,13 +212,23 @@ The JavaScript bridge in `cmd/cel-handoff/bridge_js.go` gives the executor as `g
 
 A module with no command arguments serves the bridge. Under Node with arguments, the same module serves the command line.
 
-The vectors in [conformance/executor/](../src/cel-lifecycle/conformance/executor/) state the expected entries and refusals. Each vector has a bundle without a build identity, a pin without `bundle_ref` and `engine_build`, and steps. A harness binds the bundle and the pin to the build under test. `executor_test.go` runs the vectors on a native build and as WASM under Node. `web/node-check.mjs` runs them through the bridge. `verify.py` compares the three results: they must be equal except for the build identity and the bundle reference. `TestExecutorVectorDigestsAgreeWithTheHostCodec` checks each stated `inputs_ref` with the Host codec.
+The vectors in [conformance/executor/](../src/cel-lifecycle/conformance/executor/) state the expected entries and refusals. Each vector has a bundle without a build identity, a pin without `bundle_ref` and `engine_build`, and steps. A harness binds the bundle and the pin to the build under test. `executor_test.go` runs the vectors on a native build and as WASM under Node. `web/node-check.mjs` runs them through the bridge. `verify.py` compares the three results: they must be equal except for the build identity and the bundle reference. `TestExecutorVectorDigestsAgreeWithTheHostCodec` checks each stated `inputs_ref` with the Host codec. `web/browser_check.py` runs the vectors in a headless Chromium browser, and `verify.py` compares that result with the native result too.
+
+`web/entelos-executor.mjs` is the browser module for an application:
+
+- `loadModule({moduleBytes, expectedModuleRef, wasmExecUrl})` starts the module only if `contentRef("application/wasm", bytes)` is `expectedModuleRef`. Else it fails closed with `artifact_mismatch` at the `module` stage. It copies the bytes first, then checks and runs that copy, so a later change to the caller's buffer has no effect. A page runs one module. The function takes a page-wide start slot before its first `await`. A second call while a module runs or starts fails with `invalid_request` at the `module` stage. A failed match or instantiate releases the slot.
+- `ReceiptLog.open(name)` opens an IndexedDB database with the stores `entries` and `inputs`. The cursor is the key, from 1.
+- `executor.invoke(log, date, inputs)` takes the next cursor, runs the executor and stores the entry and the raw inputs in one readwrite transaction. A refusal throws an `ExecutorError` with the diagnostic and stores nothing. Two invokes at the same time get two cursors in order. The bridge evaluates an invocation when its transaction runs. Thus `executor.load` refuses with `invalid_request` at the `load` stage while an invocation is pending, so a new pin never answers an earlier invocation.
+- `log.entries({from, includeInputs})` gives the entries in cursor order for `ingest`. The raw inputs are in the export only if `includeInputs` is true.
+
+[examples/browser-executor](../examples/browser-executor/) runs the complete path: WASM qualification on the Host, a pin from the Host records, answers and a log in the browser, and an ingest of that log.
 
 Limits:
 
-- The executor has no log storage. The embedding host must give each entry a new cursor in order. A browser log in IndexedDB is the next part of #93.
+- The Go executor has no log storage. The embedding host must give each entry a new cursor in order. `ReceiptLog` does this in a browser. It does not handle storage eviction, and it does not coordinate two pages on one database.
 - The pin fields are claims of the embedding host. At ingest, the Host checks the snapshot, the bundle reference and the activation start again, and it records its own stale view. It does not yet compare the `implementation_ref` of the response with the `engine_build` of the snapshot.
-- No headless browser runs the vectors yet. Node runs the same module and the same bridge.
+- `verify.py` tests Chromium only. Other browsers are untested.
+- The expected module reference and the pin are inputs of the application. A content reference is an identity, not a signature.
 
 ## Content references for a stage bundle
 

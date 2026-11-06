@@ -78,8 +78,13 @@ jobs:
             uname -srm
             if [ -r /etc/os-release ]; then grep PRETTY_NAME /etc/os-release; else sw_vers; fi
             go version; python3 --version; node --version; git --version
+            if command -v google-chrome >/dev/null; then google-chrome --version; else "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version; fi
           } | tee "$RUNNER_TEMP/vdr-report/toolchain.txt"
       - name: Run the standalone verifier in a fresh work directory
+        # The runner image has Chrome. The browser checks load only local pages from verify.py.
+        # The Ubuntu runner can refuse the user namespaces of the Chromium sandbox, so that run turns the sandbox off.
+        env:
+          ENTELOS_BROWSER_NO_SANDBOX: ${{ startsWith(matrix.os, 'ubuntu') && '1' || '0' }}
         run: python3 -B verify.py --work "$RUNNER_TEMP/vdr-work"
       - name: Collect compact results
         if: always()
