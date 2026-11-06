@@ -279,6 +279,8 @@ func TestIngestRefusesMalformedEntries(t *testing.T) {
 		"cursor-too-large": {Array{merge(entry, Object{"cursor": Int{"9007199254740992"}})}, "invalid_request"},
 		"before-from":      {Array{merge(entry, Object{"date": "2026-10-15"})}, "out_of_scope"},
 		"other-bundle":     {Array{merge(entry, Object{"response": merge(response, Object{"bundle_ref": "sha256:" + strings.Repeat("c", 64)})})}, "artifact_mismatch"},
+		"other-build":      {Array{merge(entry, Object{"response": merge(response, Object{"implementation_ref": "sha256:" + strings.Repeat("d", 64)})})}, "artifact_mismatch"},
+		"no-build":         {Array{merge(entry, Object{"response": Object{"status": "ok", "value": true, "bundle_ref": response["bundle_ref"]}})}, "artifact_mismatch"},
 	} {
 		if _, err := host.Handle(ingestRequest(store, name, c.entries...)); codeOf(err) != c.code {
 			t.Errorf("%s: got %v, want %s", name, err, c.code)

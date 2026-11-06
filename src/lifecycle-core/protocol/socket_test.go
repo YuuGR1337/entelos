@@ -134,6 +134,74 @@ func roundTrip(t *testing.T, conn net.Conn, payload []byte) lifecycle.Object {
 	return value.(lifecycle.Object)
 }
 
+// A stored record with an unknown format gives a structured diagnostic through
+// the socket. A vector cannot make this record, because the protocol writes
+// only the current format. Thus the test plants the exact bytes in the store.
+func TestSocketRefusesAnUnknownRecordFormat(t *testing.T) {
+	inTempDir(t)
+	store, err := lifecycle.OpenGitStore("store.git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	refs := map[string]string{}
+	record := func(extra lifecycle.Object) lifecycle.Object {
+		value := lifecycle.Object{"function": "record.visible", "scope": "tenant-example", "mode": "invoke"}
+		for k, x := range extra {
+			value[k] = x
+		}
+		return value
+	}
+	root, err := store.Root()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Transact(root, "plant", lifecycle.Object{"op": "test-import"}, func(v *lifecycle.View) (any, error) {
+		// PutRaw keeps the exact bytes. Put would set the current format.
+		refs["current"] = v.PutRaw(lifecycle.Media("receipt"), lifecycle.Encode(record(lifecycle.Object{"format": lifecycle.RecordFormat})))
+		refs["unknown-major"] = v.PutRaw(lifecycle.Media("receipt"), lifecycle.Encode(record(lifecycle.Object{"format": "entelos.record/2"})))
+		refs["missing"] = v.PutRaw(lifecycle.Media("receipt"), lifecycle.Encode(record(nil)))
+		return lifecycle.Object{}, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	host, err := lifecycle.NewHost(store, noRuntime{}, readVector(t, "session-envelope.json")["context"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, l, done := startServer(t, host)
+	conn, err := net.Dial("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	ask := func(name string) lifecycle.Object {
+		payload, err := Canonical(lifecycle.Object{"protocol": "1.0", "request_id": name, "operation": "record",
+			"body": lifecycle.Object{"ref": refs[name], "kind": "receipt"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return roundTrip(t, conn, payload)
+	}
+	// The current format passes. Thus the refusals below come from the format and not from the request.
+	if got := ask("current"); got["status"] != "ok" {
+		t.Fatalf("current format: %v", got)
+	}
+	for _, name := range []string{"unknown-major", "missing"} {
+		got := ask(name)
+		diagnostic, _ := got["diagnostic"].(lifecycle.Object)
+		if got["request_id"] != name || got["status"] != "unsupported_record_format" || diagnostic["code"] != "unsupported_record_format" || diagnostic["stage"] != "store" {
+			t.Errorf("%s: %v", name, got)
+		}
+	}
+	conn.Close()
+	if err := s.Shutdown(l); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
 // Shutdown closes the open connections and removes the socket file.
 func TestShutdownRemovesSocket(t *testing.T) {
 	inTempDir(t)

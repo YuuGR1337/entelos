@@ -735,6 +735,9 @@ func (h *Host) ingest(v *View, entries any) Object {
 		if !equal(lookup(response, "bundle_ref", nil), item(snapshot, "bundle_ref")) {
 			fail("artifact_mismatch", "the response names a bundle that differs from the pinned snapshot", "")
 		}
+		if !equal(lookup(response, "implementation_ref", nil), item(snapshot, "engine_build")) {
+			fail("artifact_mismatch", "the response names a build that differs from the pinned snapshot", "")
+		}
 		responseBytes := Encode(response)
 		selection := Object{"function": item(snapshot, "function"), "scope": item(snapshot, "scope"), "date": date,
 			"snapshot_ref": entry["snapshot_ref"], "bundle_ref": item(snapshot, "bundle_ref"), "engine_build": item(snapshot, "engine_build")}

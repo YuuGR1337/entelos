@@ -118,11 +118,9 @@ Issue #93 (first part) adds the [executor](CONTRACTS.md#executor) to `cel-handof
 
 Issue #93 (second part) adds `web/entelos-executor.mjs`: a module integrity check before the module runs, and a receipt log in IndexedDB. `verify.py` runs the executor vectors in headless Chromium, and the entries are equal to the native entries except for the build and bundle identities (`browser-executor-vectors`). [examples/browser-executor](../examples/browser-executor/) runs the complete path: the Host qualifies with the WASM module, the browser answers from a pin of Host records and keeps its log, and the Host ingests that log once (`browser-executor-ingest`). In headless Chrome 156 on macOS arm64, a local fetch of the module took 14 ms and 29 ms, and the start (compile, instantiate and bridge ready) took 109 ms and 131 ms in two page loads. These numbers are for one machine and a local server. They are not a general speed claim.
 
-On 2026-11-06, M6 met its exit test at commit `bf51d0e`. `verify.py` passes on `ubuntu-24.04` and `macos-15`. Three parts of that test have narrower evidence than its text suggests:
+On 2026-11-06, M6 met its exit test at commit `bf51d0e`. `verify.py` passes on `ubuntu-24.04` and `macos-15`. The ingest item uses the browser executor, not a simulated executor. The `sidecar-client` example does not ingest.
 
-- The unknown record format has a storage vector and Host tests. No sidecar vector sends a stored record with an unknown format through the socket.
-- The ingest item uses the browser executor, not a simulated executor. The `sidecar-client` example does not ingest.
-- At ingest, the Host does not yet compare the response `implementation_ref` with the snapshot `engine_build`. The browser example checks that value itself.
+After that exit test, ingest compares the response `implementation_ref` with the snapshot `engine_build`, and a different build gives `artifact_mismatch`. A Go test also plants records with an unknown format in a Git store and reads them through a real Unix socket with the sidecar server code. That test does not run the `entelos-sidecar` binary, and the protocol vectors cannot make such a record.
 
 Keep caller walkthrough and input-correction documentation bounded to the existing examples. Numeric/structured profiles, production DBs, authentication gateways and resident-worker coordination are outside the current implemented scope.
 

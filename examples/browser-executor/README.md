@@ -40,5 +40,4 @@ The example writes `results.json` to the work directory. The file has each check
 
 - The receipt log lives in one browser profile. The example does not test storage eviction, private windows or more than one tab.
 - A content reference is an identity, not a signature. The application must supply the expected module reference and the pin from a source that it trusts.
-- At ingest, the Host does not yet compare the response `implementation_ref` with the snapshot `engine_build`. The example checks that value itself.
 - The timing is for one machine and one run. It is not a general speed claim.

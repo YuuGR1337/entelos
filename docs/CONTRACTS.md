@@ -125,7 +125,7 @@ The Host is the executor for `invoke`, `replay` and `restate`. Each of these rec
 | `snapshot_ref` | The pinned snapshot. It must be a snapshot in the store, in the trusted scope, for a function in the context `functions`. Else the result is `out_of_scope`, as for `resolve`. |
 | `date` | The invocation date, as an ISO date. |
 | `inputs_ref` | The input digest. |
-| `response` | The answer object of the executor. Its `bundle_ref` must equal the `bundle_ref` of the snapshot, or the result is `artifact_mismatch`. |
+| `response` | The answer object of the executor. Its `bundle_ref` must equal the `bundle_ref` of the snapshot, and its `implementation_ref` must equal the `engine_build` of the snapshot. Else the result is `artifact_mismatch`. |
 | `stale_reason` | Optional: `expired`, `revoked` or an empty string. The default is an empty string. An entry has no `stale` field. The Host derives `stale` on the receipt, and an entry with `stale` is `invalid_request`. |
 | `inputs` | Optional: the raw inputs. Only the upload policy permits this field. |
 
@@ -226,7 +226,7 @@ The vectors in [conformance/executor/](../src/cel-lifecycle/conformance/executor
 Limits:
 
 - The Go executor has no log storage. The embedding host must give each entry a new cursor in order. `ReceiptLog` does this in a browser. It does not handle storage eviction, and it does not coordinate two pages on one database.
-- The pin fields are claims of the embedding host. At ingest, the Host checks the snapshot, the bundle reference and the activation start again, and it records its own stale view. It does not yet compare the `implementation_ref` of the response with the `engine_build` of the snapshot.
+- The pin fields are claims of the embedding host. At ingest, the Host checks the snapshot, the bundle reference, the `implementation_ref` of the response against the `engine_build` of the snapshot and the activation start again, and it records its own stale view.
 - `verify.py` tests Chromium only. Other browsers are untested.
 - The expected module reference and the pin are inputs of the application. A content reference is an identity, not a signature.
 
