@@ -24,7 +24,7 @@ On 2026-10-29, the code moved to `src/` and `examples/`, the boundary test moved
 
 ## Next work
 
-Use [BACKLOG.md](BACKLOG.md) and the linked GitHub issues. [M6 Store-neutral core and versioned protocol](https://github.com/mohanraj00/entelos/issues/77) met its exit test on 2026-11-06. No later milestone is open. [M5](https://github.com/mohanraj00/entelos/issues/14) stays open only for the quiet share and the public post. Both need specific maintainer authorization.
+Use [BACKLOG.md](BACKLOG.md) and the linked GitHub issues. [M6 Store-neutral core and versioned protocol](https://github.com/mohanraj00/entelos/issues/77) met its exit test on 2026-11-06. No later milestone is open. On 2026-11-06, the maintainer authorized the `v0.2.0` tag on `8ace59c`. The full suite passed on `ubuntu-24.04` and `macos-15` in [CI run 42164134936](https://github.com/mohanraj00/entelos/actions/runs/42164134936) on that commit. The `CI` workflow does not start for a tag. This snapshot does not read v0.1.0 stores. [M5](https://github.com/mohanraj00/entelos/issues/14) stays open only for the quiet share and the public post. Both need specific maintainer authorization.
 
 ### M1 First contact
 
