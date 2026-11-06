@@ -58,6 +58,8 @@ try {
   const callerBytes = bytes.slice();
   const started = loadModule({ moduleBytes: callerBytes.buffer, expectedModuleRef: job.module_ref, wasmExecUrl: "./wasm_exec.js" });
   callerBytes[0] ^= 1;
+  // A second call during the start must fail and must not take the start of the first call.
+  out.concurrent_start = await attempt(() => loadModule({ moduleBytes: bytes, expectedModuleRef: job.module_ref, wasmExecUrl: "./wasm_exec.js" }));
   const executor = await started;
   const t3 = performance.now();
   out.changed_after_call = { started: true };

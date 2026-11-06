@@ -34,25 +34,36 @@ function result(raw) {
 // have the content reference expectedModuleRef (media application/wasm), so
 // a changed module fails closed before it runs. wasmExecUrl names the Go
 // support script wasm_exec.js of the same Go release that built the module.
-// A page can run one module. The function copies the bytes first and checks
-// and runs that copy, so a later change to the caller's buffer has no effect.
+// A page can run one module. The function takes the page-wide start slot
+// before its first await, so a second call during a start fails and cannot
+// take the ready signal of the first module. If the bytes do not match or the
+// module does not instantiate, the function releases the slot. The function
+// copies the bytes first and checks and runs that copy, so a later change to
+// the caller's buffer has no effect.
 export async function loadModule({ moduleBytes, expectedModuleRef, wasmExecUrl }) {
-  const bytes = new Uint8Array(moduleBytes).slice();
-  const ref = await contentRef("application/wasm", bytes);
-  if (ref !== expectedModuleRef) {
-    throw new ExecutorError({ code: "artifact_mismatch", stage: "module", field: "/module", message: `module ${ref} is not ${expectedModuleRef}` });
+  if (globalThis.entelosExecutor || globalThis.entelosExecutorReady) {
+    throw new ExecutorError({ code: "invalid_request", stage: "module", message: "this page already runs or starts a module" });
   }
-  if (globalThis.entelosExecutor) {
-    throw new ExecutorError({ code: "invalid_request", stage: "module", message: "this page already runs a module" });
+  let signal;
+  const ready = new Promise((resolve) => { signal = resolve; });
+  globalThis.entelosExecutorReady = signal;
+  let running = false;
+  try {
+    const bytes = new Uint8Array(moduleBytes).slice();
+    const ref = await contentRef("application/wasm", bytes);
+    if (ref !== expectedModuleRef) {
+      throw new ExecutorError({ code: "artifact_mismatch", stage: "module", field: "/module", message: `module ${ref} is not ${expectedModuleRef}` });
+    }
+    if (typeof globalThis.Go !== "function") await import(wasmExecUrl);
+    const go = new globalThis.Go();
+    const { instance } = await WebAssembly.instantiate(bytes, go.importObject);
+    running = true;
+    go.run(instance);
+    await ready;
+    return new Executor(globalThis.entelosExecutor, ref);
+  } finally {
+    if (!running || globalThis.entelosExecutor) delete globalThis.entelosExecutorReady;
   }
-  if (typeof globalThis.Go !== "function") await import(wasmExecUrl);
-  const ready = new Promise((resolve) => { globalThis.entelosExecutorReady = resolve; });
-  const go = new globalThis.Go();
-  const { instance } = await WebAssembly.instantiate(bytes, go.importObject);
-  go.run(instance);
-  await ready;
-  delete globalThis.entelosExecutorReady;
-  return new Executor(globalThis.entelosExecutor, ref);
 }
 
 export class Executor {
