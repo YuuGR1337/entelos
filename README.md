@@ -124,7 +124,7 @@ The answer is in `data.result.actual.value` only if both fields are `ok`. The st
 
 ## What the examples show
 
-Entelos uses [CEL](https://cel.dev) for the rule text and Git for the history. It does not add a new expression language. The repository has two examples:
+Entelos uses [CEL](https://cel.dev) for the rule text and Git for the history. It does not add a new expression language. The two main examples are:
 
 - The record filter, `record.visible`, decides if a user can see a record. Its correction changes a fixed value of the rule. [WALKTHROUGH.md](docs/WALKTHROUGH.md) shows each step.
 - The CI example, `ci.pr_should_run`, decides if a pull request starts CI. Its correction changes the rule formula. It changes nested event data into string and bool inputs. It also compares the CEL rule with an ordinary typed function. The source is in [examples/ci-trigger](examples/ci-trigger/).
@@ -142,6 +142,12 @@ Both examples use these terms:
 
 The ordinary-code comparison uses the same lifecycle. It does not show that CEL or this lifecycle is always the better choice.
 
+Three smaller examples show other uses:
+
+- [tier-eligibility](examples/tier-eligibility/README.md) is a third consumer of `src/`.
+- [sidecar-client](examples/sidecar-client/README.md) calls the lifecycle only through a local socket.
+- [browser-executor](examples/browser-executor/README.md) answers in a browser from a pinned activation. Then the Host ingests the receipt log.
+
 ## Limits
 
 The callable profile accepts named string/bool variables and a boolean result. Numbers, structured wire types and custom extensions are unsupported. Internal expressions use the pinned CEL standard language. Resource ceilings are configured example bounds, not measured production-safe defaults.
@@ -150,13 +156,15 @@ This is local reference code with unstable APIs and records. Host context and re
 
 CI ingress verification is simulated. No webhook is authenticated and no pipeline is launched. Its raw-event audit sidecar is not atomic with the Git receipt. The application supplies source truth, independent expectations, admission/learning policy, authentication, retention and side effects. See [INTEGRATION.md](docs/INTEGRATION.md), [SUPPORT.md](docs/SUPPORT.md) and [SECURITY.md](SECURITY.md).
 
-The M5 security review found two open limits. The `inspect` and `record` reads do not check the scope, so a reviewer can read all records in a shared store. Use one store for each scope. A `request_key` that contains a NUL byte gives `store_error` and leaves unused Git objects, but it does not change the state.
+The M5 security review found two open limits. The `inspect` and `record` reads do not check the scope, so a reviewer can read all records in a shared store. Use one store for each scope. A `request_key` that contains a NUL byte gives `store_error` on the Git store and leaves unused Git objects, but it does not change the state. The in-memory store accepts this key. The M5 review covered the v0.1.0 Python path. Security-relevant M6 pull requests had a security review one at a time. No one repeated the review for the full Go path as one review.
+
+The sidecar serves local Unix sockets only and has no authentication. The only access control is the file mode of the socket and of its directory. An ingested receipt is the statement of the executor: the Host does not run the rule again, and a content reference is not a signature. The browser executor keeps its receipt log in one browser profile. The example does not test storage eviction, private windows or more than one tab. The application must supply the expected module reference and the pin from a source that it trusts.
 
 The complete source-to-correction workflow is reproducible here. Production adapters and operations remain separate work. Ordinary code plus Git is appropriate when these explicit contracts and histories are unnecessary.
 
 ## Run all checks
 
-Use Python, Go and Git. See [SUPPORT.md](docs/SUPPORT.md) for the tested toolchain and limits. Use a new work directory, not the demo directory. One run on a Mac took about 10 minutes, and the runner prints its result only at the end.
+Use Python, Go, Git and a Chromium browser. If the runner cannot find a browser, the browser checks fail. To name a browser, set `ENTELOS_BROWSER`. The demo does not need a browser. See [SUPPORT.md](docs/SUPPORT.md) for the tested toolchain and limits. Use a new work directory, not the demo directory. One run on a Mac took about 10 minutes, and the runner prints its result only at the end.
 
 ```sh
 export TASK_WORK="$(mktemp -d)/run"
