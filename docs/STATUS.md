@@ -24,7 +24,7 @@ On 2026-10-29, the code moved to `src/` and `examples/`, the boundary test moved
 
 ## Next work
 
-Use [BACKLOG.md](BACKLOG.md) and the linked GitHub issues. The next milestone is [M6 Store-neutral core and versioned protocol](https://github.com/mohanraj00/entelos/issues/77). [M5](https://github.com/mohanraj00/entelos/issues/14) stays open only for the quiet share and the public post. Both need specific maintainer authorization.
+Use [BACKLOG.md](BACKLOG.md) and the linked GitHub issues. [M6 Store-neutral core and versioned protocol](https://github.com/mohanraj00/entelos/issues/77) met its exit test on 2026-11-06. No later milestone is open. [M5](https://github.com/mohanraj00/entelos/issues/14) stays open only for the quiet share and the public post. Both need specific maintainer authorization.
 
 ### M1 First contact
 
@@ -117,6 +117,12 @@ Issue #95 removes the Python lifecycle core: the Python Host, its Git and in-mem
 Issue #93 (first part) adds the [executor](CONTRACTS.md#executor) to `cel-handoff`. The maintainer amended decision 0002: qualification is for each build, so the WASM module has its own `implementation_ref`. The same command builds for `js/wasm`. In a browser it serves a JavaScript bridge; under Node with arguments it serves the command line. `verify.py` runs 7 executor vector files on the native build, as WASM under Node and through the bridge, and the entries are equal except for the build and bundle identities (`wasm-executor`). The Go lifecycle scenario also passes with the WASM module as the engine (`wasm-qualification`). On macOS arm64 with Go 1.27.2, the module is about 22 MB raw and 4.3 MB with gzip level 9, and the Node cold start was 63 ms. A browser cold start is unmeasured. The IndexedDB receipt log, the headless browser run and the ingest of a browser log are not done yet.
 
 Issue #93 (second part) adds `web/entelos-executor.mjs`: a module integrity check before the module runs, and a receipt log in IndexedDB. `verify.py` runs the executor vectors in headless Chromium, and the entries are equal to the native entries except for the build and bundle identities (`browser-executor-vectors`). [examples/browser-executor](../examples/browser-executor/) runs the complete path: the Host qualifies with the WASM module, the browser answers from a pin of Host records and keeps its log, and the Host ingests that log once (`browser-executor-ingest`). In headless Chrome 156 on macOS arm64, a local fetch of the module took 14 ms and 29 ms, and the start (compile, instantiate and bridge ready) took 109 ms and 131 ms in two page loads. These numbers are for one machine and a local server. They are not a general speed claim.
+
+On 2026-11-06, M6 met its exit test at commit `bf51d0e`. `verify.py` passes on `ubuntu-24.04` and `macos-15`. Three parts of that test have narrower evidence than its text suggests:
+
+- The unknown record format has a storage vector and Host tests. No sidecar vector sends a stored record with an unknown format through the socket.
+- The ingest item uses the browser executor, not a simulated executor. The `sidecar-client` example does not ingest.
+- At ingest, the Host does not yet compare the response `implementation_ref` with the snapshot `engine_build`. The browser example checks that value itself.
 
 Keep caller walkthrough and input-correction documentation bounded to the existing examples. Numeric/structured profiles, production DBs, authentication gateways and resident-worker coordination are outside the current implemented scope.
 
