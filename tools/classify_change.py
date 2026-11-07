@@ -7,13 +7,13 @@ import subprocess
 import sys
 
 # A code change runs the full suite. A docs-only change runs the project check only.
-CODE=['src/*','examples/*','tests/*','tools/*','verify.py','.github/workflows/ci.yml']
+CODE=['src/*','examples/*','tests/*','tools/*','verify.py','Makefile','.github/workflows/ci.yml']
 # A security-relevant change needs a recorded security review before merge.
 # Almost every runtime source runs commands, Git or CEL, so all executable sources count. Tests do not.
 SOURCES=['src/*.go','src/*.py','examples/*.py']
 NOT_SECURITY=['*_test.go','*/test_*.py','tests/*']
 # These paths count at any directory, also under tests/. An agent loads instruction files and settings from any directory depth.
-ALWAYS=['.github/*','tools/*','verify.py','*/go.mod','*/go.sum','docs/REVIEW.md','SECURITY.md','CONSTITUTION.md',
+ALWAYS=['.github/*','tools/*','verify.py','Makefile','docs/STANDARD.md','*/go.mod','*/go.sum','docs/REVIEW.md','SECURITY.md','CONSTITUTION.md',
     'AGENTS.md','CLAUDE.md','GEMINI.md','.agents/*','.claude/*','.codex/*','.gemini/*',
     '*/AGENTS.md','*/CLAUDE.md','*/GEMINI.md','*/.agents/*','*/.claude/*','*/.codex/*','*/.gemini/*']
 

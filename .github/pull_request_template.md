@@ -1,19 +1,13 @@
-## Issue
-
 Closes #
 
-## Change
+## Testing
 
-<!-- Describe the behavior that changed. -->
+Give each command that you ran and its result.
 
-## Checks
+## Risk
 
-- [ ] `python3 -B tools/check_project.py`
-- [ ] `python3 -B verify.py --work "$TASK_WORK"` (code changes only)
-- [ ] Code review: <harness and version, link to the comment> (a contributor without a harness writes "maintainer")
-- [ ] Security review: <link to the comment, "maintainer", or "not needed" and the reason>
-- [ ] Each finding is fixed, or has a reason in this PR
+State what can fail, and the approval level of this change.
 
-## Limits
+## How to revert
 
-<!-- State what you did not test and what is not supported. -->
+State how to undo this change.
