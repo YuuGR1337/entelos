@@ -18,6 +18,16 @@ This source-only reference does not vendor dependencies or distribute compiled b
 
 The author CLI is fetched separately from its pinned public repository, which retains its Apache-2.0 license and dependency notices. Its source and binaries are not in this tree.
 
+## CI tools
+
+The [Claude review](../.github/workflows/claude-review.yml) workflow downloads one tool on the GitHub runner. The tool is not in this tree, and this project does not distribute it.
+
+| Package | Version | Observed license | Use |
+|---|---|---|---|
+| @anthropic-ai/claude-code-linux-x64 | 2.1.319 | Proprietary. The package `LICENSE.md` says "All rights reserved" and points to the Anthropic legal agreements at https://code.claude.com/docs/en/legal-and-compliance. | The workflow checks the SHA-512 value of the package, then runs the CLI on the runner with the owner's OAuth token. |
+
+The Apache-2.0 licence of this project does not apply to this tool. The owner's account agreement with Anthropic controls its use. If the workflow changes the CLI version, change this row too.
+
 Before distributing any binary, enumerate its actual linked dependencies and retain required license/NOTICE/copyright material. That includes any optional tool binary selected for distribution. A source-only reference is not permission to omit upstream notices from a later binary release.
 
 Python standard-library and system Git are prerequisites, not bundled software. The workflow/schema sources are credited in docs/PROVENANCE.md; provider schemas and native Tekton code are not copied.
