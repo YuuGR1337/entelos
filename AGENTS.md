@@ -23,16 +23,16 @@ Start from a GitHub issue with a concrete workflow and completion criteria. Insp
 
 Map the change to its question before adding machinery. Keep authoring and calling usable through explicit contracts and structured diagnostics. Separate domain projection/authority/policy from reusable mechanics. Use independently stated expectations; never label a candidate's own output as its oracle.
 
-Run the checks relevant to the change. For project docs/skills/layout:
+Run the checks relevant to the change. For every change, run the project check and the Claude review tests:
 
 ```sh
-python3 -B tools/check_project.py
+make check
 ```
 
-For runtime, profile, lifecycle, fixture or dependency changes, use the full runner with a fresh external work directory:
+For runtime, profile, lifecycle, fixture or dependency changes, also use the full runner with a fresh external work directory:
 
 ```sh
-python3 -B verify.py --work "$TASK_WORK"
+make verify TASK_WORK="$TASK_WORK"
 ```
 
 The runner builds pinned public dependencies, runs Go tests/vet, Python checks, lifecycle conformance, regressions and both consumer examples. It retains generated results under the supplied work directory. Keep caches, binaries, logs and generated stores outside the source checkout. Use the host's configured local scratch directory; avoid cloud-synced folders for temporary work. Use `python3 -B` to avoid source-side bytecode.
@@ -53,6 +53,8 @@ Flag these as high priority in a PR review:
 - A content hash used as a signature or as an authority.
 - Private application material, customer data, credentials or generated binaries in the repo.
 - An unpinned action or dependency, or a dependency without a recorded licence.
+
+Skip these paths: `checksums.json`, `licenses/`, `docs/STANDARD.md` and `.github/pull_request_template.md`. The first two are generated or third-party text. The last two are exact copies of the shared standard. Report at most 3 nits, and mark each one as a nit.
 
 End a code review with one line. Write `Security review: needed`, with the reason, if `tools/classify_change.py` marks a changed path as security-relevant. Else write `Security review: not needed`. A security review does not end with this line.
 

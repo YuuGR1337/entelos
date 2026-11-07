@@ -10,7 +10,7 @@ import sys
 ROOT=Path(__file__).resolve().parents[1]
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('--write-checksums',action='store_true');a=p.parse_args()
 required=['CONSTITUTION.md','AGENTS.md','CLAUDE.md','GEMINI.md','README.md','docs/SUPPORT.md','SECURITY.md',
-    'docs/STATUS.md','docs/BACKLOG.md','docs/CONTRACTS.md','.agents/skills/decision-workflow/SKILL.md',
+    'docs/STATUS.md','docs/BACKLOG.md','docs/CONTRACTS.md','docs/STANDARD.md','Makefile','.agents/skills/decision-workflow/SKILL.md',
     'docs/REVIEW.md','.github/CODEOWNERS','.github/workflows/ci.yml','.github/workflows/pr-policy.yml','.github/workflows/pr-policy-rerun.yml','.github/workflows/claude-review.yml','.github/ISSUE_TEMPLATE/bug.yml','.github/ISSUE_TEMPLATE/workflow.yml','.github/ISSUE_TEMPLATE/config.yml']
 errors=[];inventory={};links=0
 for path in sorted(ROOT.rglob('*')):
@@ -42,19 +42,19 @@ sys.path.insert(0,str(ROOT/'tools'))
 from classify_change import classify
 for path,code,security in [('README.md',False,False),('src/lifecycle-core/host.go',True,True),
         ('src/lifecycle-core/gitstore.go',True,True),('src/lifecycle-core/client/lifecycle_client.py',True,True),('src/cel-handoff/handoff_test.go',True,False),('src/cel-handoff/go.sum',True,True),
-        ('tools/classify_change.py',True,True),('.github/workflows/ci.yml',True,True),('.codex/config.toml',False,True),('GEMINI.md',False,True),
+        ('tools/classify_change.py',True,True),('Makefile',True,True),('docs/STANDARD.md',False,True),('.github/workflows/ci.yml',True,True),('.codex/config.toml',False,True),('GEMINI.md',False,True),
         ('docs/AGENTS.md',False,True),('src/cel-handoff/tools/prepare.py',True,True),('examples/ci-trigger/run.py',True,True),
         ('src/protocol/test_protocol.py',True,False),('src/lifecycle-core/scenario_test.go',True,False),('tests/test_export_boundaries.py',True,False),('docs/STATUS.md',False,False),('docs/REVIEW.md',False,True),('src/cel-lifecycle/.claude/settings.json',True,True),
         ('tests/AGENTS.md',True,True),('tests/CLAUDE.md',True,True),('tests/.claude/settings.json',True,True),('tests/go.mod',True,True),('src/cel-handoff/x_test.go',True,False)]:
     got=classify([path])
     if (got['code'],got['security'])!=(code,security):errors.append('classification changed for %s: code=%s security=%s'%(path,got['code'],got['security']))
 # Review events default to the PR merge ref, so the Claude review must check out the default branch.
-claude=(ROOT/'.github/workflows/claude-review.yml').read_text()
-if 'ref: ${{ github.event.repository.default_branch }}' not in claude:errors.append('claude-review.yml must check out the default branch')
-# PR text can tell Claude to show a credential, so the tools get no token and no gh command.
-for need in ["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1'",'bubblewrap','Read(//proc/**)']:
-    if need not in claude:errors.append('claude-review.yml must keep '+need)
-if 'Bash(gh' in claude:errors.append('claude-review.yml must not allow gh commands')
+# The Claude review workflow keeps the design in docs/REVIEW.md. tools/claude_review.py owns the list of checks.
+from claude_review import workflow_errors
+errors+=['claude-review.yml '+x for x in workflow_errors((ROOT/'.github/workflows/claude-review.yml').read_text())]
+# The licence record of the downloaded CLI must name the pinned version.
+cli=re.search(r'CLI_VERSION: (\S+)\n',(ROOT/'.github/workflows/claude-review.yml').read_text())
+if not cli or '| @anthropic-ai/claude-code-linux-x64 | %s |'%cli.group(1) not in (ROOT/'licenses/THIRD_PARTY.md').read_text():errors.append('licenses/THIRD_PARTY.md must record the Claude CLI version of claude-review.yml')
 # The agy fallback must not load the maintainer's global allow rules or MCP servers.
 review=(ROOT/'tools/cross_review.py').read_text()
 for need in ["env['HOME']=home","'--sandbox'","'allow':[]"]:
