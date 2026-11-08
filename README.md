@@ -187,6 +187,8 @@ To call a function from your own code, see [Call a rule from your service](#call
 
 Start with [CONSTITUTION.md](CONSTITUTION.md), [AGENTS.md](AGENTS.md) and [current work](docs/STATUS.md). Codex and Claude Code share those rules and the same skill source. [Tracked issues](docs/BACKLOG.md) define the bounded next work. [Contract map](docs/CONTRACTS.md) points to the executable interfaces.
 
+The [CI trigger example](examples/ci-trigger/README.md) names its entry point `run.py`, its arguments, its files and its result.
+
 ## Name, source and license
 
 The tagline is "Entelos: grow toward the goal." Entelos (from Greek *en* + *telos*, "the goal within") is the name of this versioned decision reference. The repository is `mohanraj00/entelos`; its earlier name was `versioned-decision-reference`. [Brand assets](docs/brand/README.md) holds the mark, the logo and the colours.
